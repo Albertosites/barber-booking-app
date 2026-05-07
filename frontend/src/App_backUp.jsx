@@ -1,25 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Home,
-  CalendarPlus,
-  CalendarCheck,
-  Info,
-  UserRound,
-  LogIn,
-  UserPlus,
-  CalendarDays,
-  Scissors,
-  Ban,
-  MapPin,
-  Clock3,
-  Phone,
-} from "lucide-react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
 
 const SHOP_ID = "0c0f8c8e-6b93-45a0-a97b-688394b769a3";
-
-const OPENING_REASON_PREFIX = "__EXCEPTIONAL_OPENING__:";
 
 const slots = [
   "09:00", "09:30", "10:00", "10:30",
@@ -147,66 +130,14 @@ function timeToMinutes(timeString) {
   return hours * 60 + minutes;
 }
 
-function isExceptionalOpeningBlock(block) {
-  return String(block.reason || "").startsWith(OPENING_REASON_PREFIX);
-}
-
-function getCleanAvailabilityReason(block) {
-  const reason = String(block.reason || "");
-
-  if (reason.startsWith(OPENING_REASON_PREFIX)) {
-    return reason.replace(OPENING_REASON_PREFIX, "").trim();
-  }
-
-  return reason;
-}
-
-function getExceptionalOpeningsForDate(dateString, availabilityBlocks) {
-  if (!dateString) return [];
-
-  return availabilityBlocks.filter((block) => {
-    if (!block.active) return false;
-    if (!isExceptionalOpeningBlock(block)) return false;
-
-    return !block.recurring && block.block_date === dateString;
-  });
-}
-
-function isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks) {
-  const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length === 0) return false;
-
-  return exceptionalOpenings.some((block) => {
-    const startMinutes = timeToMinutes(block.start_time);
-    const endMinutes = timeToMinutes(block.end_time);
-
-    if (startMinutes === null || endMinutes === null || slotMinutes === null) {
-      return false;
-    }
-
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  });
-}
-
-function hasExceptionalOpeningForDate(dateString, availabilityBlocks) {
-  return getExceptionalOpeningsForDate(dateString, availabilityBlocks).length > 0;
-}
 function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
   if (!dateString) return false;
 
   const selectedWeekday = getWeekdayFromDate(dateString);
   const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return !isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks);
-  }
 
   return availabilityBlocks.some((block) => {
     if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
 
     const appliesToDate =
       (!block.recurring && block.block_date === dateString) ||
@@ -226,32 +157,8 @@ function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
     return slotMinutes >= startMinutes && slotMinutes < endMinutes;
   });
 }
-function isOperatorBookedAtSlot(bookings, dateString, slot, operatorId) {
-  if (!dateString || !slot || !operatorId) return false;
-
-  return bookings.some((booking) => {
-    if (booking.date !== dateString || booking.time !== slot) return false;
-
-    if (!booking.operator_id) return true;
-
-    return booking.operator_id === operatorId;
-  });
-}
-
-function hasAtLeastOneOperatorAvailableAtSlot(bookings, dateString, slot, activeOperators) {
-  if (!dateString || !slot) return false;
-  if (activeOperators.length === 0) return false;
-
-  return activeOperators.some((operator) => {
-    return !isOperatorBookedAtSlot(bookings, dateString, slot, operator.id);
-  });
-}
 
 function formatAvailabilityBlockTitle(block) {
-  if (isExceptionalOpeningBlock(block)) {
-    return formatLongDate(block.block_date);
-  }
-
   if (block.recurring) {
     return `Ogni ${getWeekdayLabel(block.weekday)}`;
   }
@@ -269,19 +176,9 @@ function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableS
   if (!dateString) return null;
 
   const selectedWeekday = getWeekdayFromDate(dateString);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return {
-      type: "limited",
-      title: "Apertura eccezionale attiva per questa data.",
-      text: "Il salone normalmente potrebbe risultare chiuso, ma per questo giorno sono disponibili solo gli orari aperti manualmente dal barbiere.",
-    };
-  }
 
   const matchingBlocks = availabilityBlocks.filter((block) => {
     if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
 
     return (
       (!block.recurring && block.block_date === dateString) ||
@@ -348,24 +245,16 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState("agenda");
   const [adminContentTab, setAdminContentTab] = useState("services");
-  const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
   const [adminImages, setAdminImages] = useState([]);
-  const [adminOperators, setAdminOperators] = useState([]);
-  const [operators, setOperators] = useState([]);
   const [adminBookings, setAdminBookings] = useState([]);
   const [availabilityBlocks, setAvailabilityBlocks] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [uploadingImageId, setUploadingImageId] = useState("");
   const [adminBookingToDelete, setAdminBookingToDelete] = useState(null);
   const [adminDeleteLoading, setAdminDeleteLoading] = useState(false);
-  const [operatorSavingId, setOperatorSavingId] = useState("");
-  const [operatorDeletingId, setOperatorDeletingId] = useState("");
-  const [newOperatorName, setNewOperatorName] = useState("");
-  const [newOperatorRole, setNewOperatorRole] = useState("");
-  const [newOperatorSortOrder, setNewOperatorSortOrder] = useState("0");
-  const [operatorCreating, setOperatorCreating] = useState(false);
+
   const [availabilityMode, setAvailabilityMode] = useState("date_full_day");
   const [availabilityDate, setAvailabilityDate] = useState("");
   const [availabilityWeekday, setAvailabilityWeekday] = useState("1");
@@ -375,17 +264,10 @@ function App() {
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [availabilityDeletingId, setAvailabilityDeletingId] = useState("");
 
-  const [openingDate, setOpeningDate] = useState("");
-  const [openingStartTime, setOpeningStartTime] = useState("");
-  const [openingEndTime, setOpeningEndTime] = useState("");
-  const [openingReason, setOpeningReason] = useState("");
-  const [openingSaving, setOpeningSaving] = useState(false);
-
   const [showManualBookingForm, setShowManualBookingForm] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
   const [manualService, setManualService] = useState("");
-  const [manualOperatorId, setManualOperatorId] = useState("");
   const [manualDate, setManualDate] = useState("");
   const [manualTime, setManualTime] = useState("");
   const [manualBookingLoading, setManualBookingLoading] = useState(false);
@@ -409,7 +291,6 @@ function App() {
   const bookingSubmitLockRef = useRef(false);
   const manualBookingSubmitLockRef = useRef(false);
   const availabilitySubmitLockRef = useRef(false);
-  const openingSubmitLockRef = useRef(false);
 
   const [authMode, setAuthMode] = useState("login");
   const [authFullName, setAuthFullName] = useState("");
@@ -419,7 +300,6 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
 
   const [service, setService] = useState("");
-  const [operatorId, setOperatorId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [bookings, setBookings] = useState([]);
@@ -431,14 +311,6 @@ function App() {
   }, [serviceCategories]);
 
   const selectedService = allServices.find((item) => item.name === service);
-
-  const selectedOperator = operators.find((item) => item.id === operatorId);
-
-  const selectedManualOperator = operators.find((item) => item.id === manualOperatorId);
-
-  const activeOperators = useMemo(() => {
-    return operators.filter((operator) => operator.active !== false);
-  }, [operators]);
 
   const today = useMemo(() => {
     return getTodayString();
@@ -496,16 +368,8 @@ function App() {
     return Object.keys(groupedAdminServices).sort();
   }, [groupedAdminServices]);
 
-  const closureBlocks = useMemo(() => {
-    return availabilityBlocks.filter((block) => !isExceptionalOpeningBlock(block));
-  }, [availabilityBlocks]);
-
-  const exceptionalOpeningBlocks = useMemo(() => {
-    return availabilityBlocks.filter((block) => isExceptionalOpeningBlock(block));
-  }, [availabilityBlocks]);
-
   const sortedAvailabilityBlocks = useMemo(() => {
-    return [...closureBlocks].sort((a, b) => {
+    return [...availabilityBlocks].sort((a, b) => {
       if (a.recurring !== b.recurring) {
         return a.recurring ? 1 : -1;
       }
@@ -515,64 +379,27 @@ function App() {
 
       return String(first).localeCompare(String(second));
     });
-  }, [closureBlocks]);
+  }, [availabilityBlocks]);
 
-  const sortedExceptionalOpeningBlocks = useMemo(() => {
-    return [...exceptionalOpeningBlocks].sort((a, b) => {
-      const first = a.block_date || "";
-      const second = b.block_date || "";
-
-      if (first !== second) {
-        return String(first).localeCompare(String(second));
-      }
-
-      return String(a.start_time || "").localeCompare(String(b.start_time || ""));
-    });
-  }, [exceptionalOpeningBlocks]);
-
-   const availableSlots = useMemo(() => {
-    return slots.filter((slot) => {
-      if (isSlotBlockedByAvailability(slot, date, availabilityBlocks)) {
-        return false;
-      }
-
-      if (operatorId) {
-        return !isOperatorBookedAtSlot(bookings, date, slot, operatorId);
-      }
-
-      return hasAtLeastOneOperatorAvailableAtSlot(bookings, date, slot, activeOperators);
-    });
-  }, [activeOperators, availabilityBlocks, bookings, date, operatorId]);
+  const availableSlots = useMemo(() => {
+    return slots.filter(
+      (slot) =>
+        !bookings.some((b) => b.date === date && b.time === slot) &&
+        !isSlotBlockedByAvailability(slot, date, availabilityBlocks)
+    );
+  }, [availabilityBlocks, bookings, date]);
 
   const bookingAvailabilityNotice = useMemo(() => {
     return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots);
   }, [availabilityBlocks, availableSlots, date]);
 
-   const manualAvailableSlots = useMemo(() => {
-    return slots.filter((slot) => {
-      if (isSlotBlockedByAvailability(slot, manualDate, availabilityBlocks)) {
-        return false;
-      }
-
-      if (manualOperatorId) {
-        return !isOperatorBookedAtSlot(bookings, manualDate, slot, manualOperatorId);
-      }
-
-      return hasAtLeastOneOperatorAvailableAtSlot(bookings, manualDate, slot, activeOperators);
-    });
-  }, [activeOperators, availabilityBlocks, bookings, manualDate, manualOperatorId]);
-
-  const avatarLabel = useMemo(() => {
-    if (!session?.user) return null;
-
-    const cleanName = userProfile?.full_name?.trim();
-
-    if (cleanName) {
-      return cleanName.charAt(0).toUpperCase();
-    }
-
-    return session.user.email?.charAt(0)?.toUpperCase() || "U";
-  }, [session, userProfile]);
+  const manualAvailableSlots = useMemo(() => {
+    return slots.filter(
+      (slot) =>
+        !bookings.some((b) => b.date === manualDate && b.time === slot) &&
+        !isSlotBlockedByAvailability(slot, manualDate, availabilityBlocks)
+    );
+  }, [availabilityBlocks, bookings, manualDate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -594,12 +421,11 @@ function App() {
     };
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     loadServices();
     loadHomeImages();
     loadBookings();
     loadAvailabilityBlocks();
-    loadOperators();
   }, []);
 
   useEffect(() => {
@@ -824,23 +650,23 @@ function App() {
     setIsAdmin(data?.role === "admin");
   }
 
- async function deleteOldBookings() {
-  const { error } = await supabase.rpc("delete_old_bookings");
+  async function deleteOldBookings() {
+    const { error } = await supabase.rpc("delete_old_bookings");
 
-  if (error) {
-    console.warn("Pulizia prenotazioni vecchie non eseguita:", error);
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare le prenotazioni vecchie.");
+    }
   }
-}
 
   async function loadAdminData() {
     setAdminLoading(true);
 
     await deleteOldBookings();
 
-        await Promise.all([
+    await Promise.all([
       loadAdminServices(),
       loadAdminImages(),
-      loadAdminOperators(),
       loadAdminBookings(),
       loadAvailabilityBlocks(),
     ]);
@@ -879,41 +705,7 @@ function App() {
 
     setAdminImages(data || []);
   }
-  async function loadOperators() {
-    const { data, error } = await supabase
-      .from("operators")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .eq("active", true)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
 
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento degli operatori.");
-      return;
-    }
-
-    setOperators(data || []);
-  }
-
-  async function loadAdminOperators() {
-    const { data, error } = await supabase
-      .from("operators")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento degli operatori admin.");
-      return;
-    }
-
-    setAdminOperators(data || []);
-  }
-  
   async function loadAdminBookings() {
     await deleteOldBookings();
 
@@ -950,13 +742,7 @@ function App() {
       )
     );
   }
-  function updateAdminOperatorField(id, field, value) {
-    setAdminOperators((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
-  }
+
   async function saveAdminService(item) {
     const { error } = await supabase
       .from("services")
@@ -1002,121 +788,12 @@ function App() {
       alert("Non è stato possibile salvare l’immagine.");
       return;
     }
- 
+
     await loadHomeImages();
     await loadAdminImages();
     alert("Immagine aggiornata.");
   }
-  async function createAdminOperator(e) {
-    e.preventDefault();
 
-    if (operatorCreating) return;
-
-    const cleanName = newOperatorName.trim();
-    const cleanRole = newOperatorRole.trim();
-
-    if (!cleanName) {
-      alert("Inserisci il nome dell’operatore.");
-      return;
-    }
-
-    setOperatorCreating(true);
-
-    const { error } = await supabase
-      .from("operators")
-      .insert([
-        {
-          shop_id: SHOP_ID,
-          name: cleanName,
-          role: cleanRole || null,
-          active: true,
-          sort_order: Number(newOperatorSortOrder || 0),
-        },
-      ]);
-
-    setOperatorCreating(false);
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile creare l’operatore.");
-      return;
-    }
-
-    setNewOperatorName("");
-    setNewOperatorRole("");
-    setNewOperatorSortOrder("0");
-
-    await loadOperators();
-    await loadAdminOperators();
-
-    alert("Operatore aggiunto.");
-  }
-
-  async function saveAdminOperator(item) {
-    const cleanName = String(item.name || "").trim();
-
-    if (!cleanName) {
-      alert("Il nome dell’operatore non può essere vuoto.");
-      return;
-    }
-
-    setOperatorSavingId(item.id);
-
-    const { error } = await supabase
-      .from("operators")
-      .update({
-        name: cleanName,
-        role: item.role || null,
-        active: Boolean(item.active),
-        sort_order: Number(item.sort_order || 0),
-      })
-      .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
-
-    setOperatorSavingId("");
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile salvare l’operatore.");
-      return;
-    }
-
-    await loadOperators();
-    await loadAdminOperators();
-    await loadBookings();
-    await loadAdminBookings();
-
-    alert("Operatore aggiornato.");
-  }
-
-  async function deleteAdminOperator(item) {
-    const confirmDelete = window.confirm(
-      "Vuoi eliminare questo operatore? Se ha prenotazioni già associate, è meglio disattivarlo invece di eliminarlo."
-    );
-
-    if (!confirmDelete) return;
-
-    setOperatorDeletingId(item.id);
-
-    const { error } = await supabase
-      .from("operators")
-      .delete()
-      .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
-
-    setOperatorDeletingId("");
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile eliminare l’operatore. Se ha prenotazioni associate, disattivalo invece di eliminarlo.");
-      return;
-    }
-
-    await loadOperators();
-    await loadAdminOperators();
-
-    alert("Operatore eliminato.");
-  }
   async function uploadAdminHomeImage(item, file) {
     if (!file) return;
 
@@ -1332,85 +1009,8 @@ function App() {
     alert("Disponibilità aggiornata.");
   }
 
-  async function createExceptionalOpening(e) {
-    e.preventDefault();
-
-    if (openingSubmitLockRef.current || openingSaving) return;
-
-    if (!session?.user || !isAdmin) {
-      alert("Solo un admin può creare aperture eccezionali.");
-      return;
-    }
-
-    const cleanReason = openingReason.trim();
-
-    if (!openingDate) {
-      alert("Scegli il giorno da aprire eccezionalmente.");
-      return;
-    }
-
-    if (!openingStartTime || !openingEndTime) {
-      alert("Scegli orario di apertura e chiusura.");
-      return;
-    }
-
-    if (timeToMinutes(openingStartTime) >= timeToMinutes(openingEndTime)) {
-      alert("L’orario di fine deve essere successivo all’orario di inizio.");
-      return;
-    }
-
-    openingSubmitLockRef.current = true;
-    setOpeningSaving(true);
-
-    const payload = {
-      shop_id: SHOP_ID,
-      block_date: openingDate,
-      weekday: null,
-      start_time: openingStartTime,
-      end_time: openingEndTime,
-      full_day: false,
-      recurring: false,
-      active: true,
-      reason: `${OPENING_REASON_PREFIX}${cleanReason || "Apertura eccezionale"}`,
-      created_by: session.user.id,
-    };
-
-    const { error } = await supabase
-      .from("availability_blocks")
-      .insert([payload]);
-
-    if (error) {
-      openingSubmitLockRef.current = false;
-      setOpeningSaving(false);
-      console.error(error);
-      alert("Non è stato possibile salvare l’apertura eccezionale.");
-      return;
-    }
-
-    setOpeningDate("");
-    setOpeningStartTime("");
-    setOpeningEndTime("");
-    setOpeningReason("");
-
-    await loadAvailabilityBlocks();
-    await loadBookings();
-
-    if (isAdmin) {
-      await loadAdminBookings();
-    }
-
-    openingSubmitLockRef.current = false;
-    setOpeningSaving(false);
-    alert("Apertura eccezionale salvata.");
-  }
-
   async function deleteAvailabilityBlock(block) {
-    const confirmDelete = window.confirm(
-      isExceptionalOpeningBlock(block)
-        ? "Vuoi rimuovere questa apertura eccezionale?"
-        : "Vuoi rimuovere questa chiusura?"
-    );
-
+    const confirmDelete = window.confirm("Vuoi rimuovere questa chiusura?");
     if (!confirmDelete) return;
 
     setAvailabilityDeletingId(block.id);
@@ -1425,12 +1025,12 @@ function App() {
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare questa disponibilità.");
+      alert("Non è stato possibile eliminare la chiusura.");
       return;
     }
 
     await loadAvailabilityBlocks();
-    alert(isExceptionalOpeningBlock(block) ? "Apertura eccezionale rimossa." : "Chiusura rimossa.");
+    alert("Chiusura rimossa.");
   }
 
   async function loadBookings() {
@@ -1733,7 +1333,6 @@ function App() {
     setAdminBookings([]);
     setAdminServices([]);
     setAdminImages([]);
-    setAdminOperators([]);
     setAdminTab("agenda");
     setShowJoinShopPopup(false);
     setShowProfileMenu(false);
@@ -1778,19 +1377,14 @@ function App() {
       return;
     }
 
-        if (!selectedOperator) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Scegli l’operatore con cui vuoi prenotare.");
-      return;
-    }
-
-    const alreadyBooked = isOperatorBookedAtSlot(bookings, date, time, selectedOperator.id);
+    const alreadyBooked = bookings.some(
+      (booking) => booking.date === date && booking.time === time
+    );
 
     if (alreadyBooked) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Questo operatore non è più disponibile in questo orario. Scegli un altro orario o un altro operatore.");
+      alert("Questo orario non è più disponibile. Scegline un altro.");
       await loadBookings();
       return;
     }
@@ -1817,8 +1411,6 @@ function App() {
         name: profileName,
         phone: profilePhone,
         user_id: session.user.id,
-        operator_id: selectedOperator.id,
-        operator_name: selectedOperator.name,
         shop_id: SHOP_ID,
       },
     ]);
@@ -1832,7 +1424,6 @@ function App() {
     }
 
     setService("");
-    setOperatorId("");
     setDate("");
     setTime("");
     setOpenCategory("");
@@ -1849,7 +1440,6 @@ function App() {
     alert("Prenotazione confermata!");
     setActivePage("my-bookings");
   }
-
   async function createManualBooking(e) {
     e.preventDefault();
 
@@ -1859,20 +1449,22 @@ function App() {
     const cleanPhone = manualPhone.trim();
     const cleanService = manualService.trim() || "Prenotazione telefonica";
 
-        if (!cleanName || !cleanPhone || !manualDate || !manualTime || !selectedManualOperator) {
-      alert("Inserisci almeno nome, telefono, operatore, giorno e ora.");
+    if (!cleanName || !cleanPhone || !manualDate || !manualTime) {
+      alert("Inserisci almeno nome, telefono, giorno e ora.");
       return;
     }
 
     manualBookingSubmitLockRef.current = true;
     setManualBookingLoading(true);
 
-     const alreadyBooked = isOperatorBookedAtSlot(bookings, manualDate, manualTime, selectedManualOperator.id);
+    const alreadyBooked = bookings.some(
+      (booking) => booking.date === manualDate && booking.time === manualTime
+    );
 
     if (alreadyBooked) {
       manualBookingSubmitLockRef.current = false;
       setManualBookingLoading(false);
-      alert("Questo operatore risulta già occupato in questo orario. Aggiorna l’agenda o scegli un altro orario.");
+      alert("Questo orario risulta già occupato. Aggiorna l’agenda o scegli un altro orario.");
       await loadBookings();
       await loadAdminBookings();
       return;
@@ -1895,8 +1487,6 @@ function App() {
         time: manualTime,
         name: cleanName,
         phone: cleanPhone,
-        operator_id: selectedManualOperator.id,
-        operator_name: selectedManualOperator.name,
         user_id: null,
         created_by: session.user.id,
         shop_id: SHOP_ID,
@@ -1918,8 +1508,6 @@ function App() {
       time: manualTime,
       name: cleanName,
       phone: cleanPhone,
-      operator_id: selectedManualOperator.id,
-      operator_name: selectedManualOperator.name,
       user_id: null,
       created_by: session.user.id,
       shop_id: SHOP_ID,
@@ -1940,7 +1528,6 @@ function App() {
     setManualName("");
     setManualPhone("");
     setManualService("");
-    setManualOperatorId("");
     setManualDate("");
     setManualTime("");
     setShowManualBookingForm(false);
@@ -2025,32 +1612,16 @@ function App() {
 
               <div className="profile-wrapper">
                 <button
-                className="avatar profile-button"
-                type="button"
-                onClick={() => setShowProfileMenu((current) => !current)}
-                aria-label="Apri profilo"
+                  className="avatar profile-button"
+                  type="button"
+                  onClick={() => setShowProfileMenu((current) => !current)}
+                  aria-label="Apri profilo"
                 >
-                {session?.user ? (
-                avatarLabel
-                ) : (
-                <UserRound size={22} strokeWidth={2.4} />
-                )}
+                  {session?.user?.email?.charAt(0)?.toUpperCase() || "B"}
                 </button>
 
                 {showProfileMenu && (
                   <div className="profile-menu">
-                    {!session?.user && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivePage("account");
-                          setShowProfileMenu(false);
-                        }}
-                      >
-                        Accedi o registrati
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={() => {
@@ -2061,32 +1632,28 @@ function App() {
                       Privacy
                     </button>
 
-                    {session?.user && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={openCredentialsModal}
-                        >
-                          Cambia credenziali
-                        </button>
+                    <button
+                      type="button"
+                      onClick={openCredentialsModal}
+                    >
+                      Cambia credenziali
+                    </button>
 
-                        <button
-                          type="button"
-                          onClick={logout}
-                        >
-                          Logout
-                        </button>
+                    <button
+                      type="button"
+                      onClick={logout}
+                    >
+                      Logout
+                    </button>
 
-                        <button
-                          className="danger-item"
-                          type="button"
-                          disabled={deleteAccountLoading}
-                          onClick={deleteAccount}
-                        >
-                          {deleteAccountLoading ? "Eliminazione..." : "Cancella account"}
-                        </button>
-                      </>
-                    )}
+                    <button
+                      className="danger-item"
+                      type="button"
+                      disabled={deleteAccountLoading}
+                      onClick={deleteAccount}
+                    >
+                      {deleteAccountLoading ? "Eliminazione..." : "Cancella account"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -2261,26 +1828,7 @@ function App() {
                 </>
               )}
 
-             <label>Operatore</label>
-              <select
-                value={operatorId}
-                onChange={(e) => {
-                  setOperatorId(e.target.value);
-                  setTime("");
-                }}
-                required
-                disabled={loading || activeOperators.length === 0}
-              >
-                <option value="">
-                  {activeOperators.length > 0 ? "Scegli un operatore" : "Nessun operatore disponibile"}
-                </option>
-                {activeOperators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>
-                    {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                  </option>
-                ))}
-              </select>
-             <label>Giorno</label>
+              <label>Giorno</label>
               <input
                 type="date"
                 value={date}
@@ -2304,31 +1852,24 @@ function App() {
               )}
 
               <label>Ora</label>
-                            <select value={time} onChange={(e) => setTime(e.target.value)} required disabled={!date || !operatorId || loading}>
-                <option value="">
-                  {!operatorId
-                    ? "Prima scegli l’operatore"
-                    : date
-                    ? "Scegli un orario"
-                    : "Prima scegli il giorno"}
-                </option>
+              <select value={time} onChange={(e) => setTime(e.target.value)} required disabled={!date || loading}>
+                <option value="">{date ? "Scegli un orario" : "Prima scegli il giorno"}</option>
                 {availableSlots.map((slot) => (
                   <option key={slot} value={slot}>{slot}</option>
                 ))}
               </select>
 
-                {(selectedService || selectedOperator || date || time) && (
+              {(selectedService || date || time) && (
                 <div className="booking-summary">
                   <span>Riepilogo appuntamento</span>
                   <div className="summary-row"><p>Servizio</p><strong>{selectedService ? selectedService.name : "Da scegliere"}</strong></div>
-                  <div className="summary-row"><p>Operatore</p><strong>{selectedOperator ? selectedOperator.name : "Da scegliere"}</strong></div>
                   <div className="summary-row"><p>Prezzo</p><strong>{selectedService ? `€${selectedService.price}` : "-"}</strong></div>
                   <div className="summary-row"><p>Data</p><strong>{date ? formatLongDate(date) : "-"}</strong></div>
                   <div className="summary-row"><p>Ora</p><strong>{time || "-"}</strong></div>
                 </div>
               )}
 
-              <button className="primary-cta" type="submit" disabled={loading || !service || !operatorId || servicesLoading || activeOperators.length === 0}>
+              <button className="primary-cta" type="submit" disabled={loading || !service || servicesLoading}>
                 {loading ? "Attendi..." : "Conferma prenotazione"}
               </button>
             </form>
@@ -2383,7 +1924,6 @@ function App() {
                         <span>Appuntamento</span>
                         <h3>{booking.service}</h3>
                         <p>{booking.name}</p>
-                      {booking.operator_name && <p>Operatore: {booking.operator_name}</p>}
                       </div>
 
                       <button className="soft-cancel-btn" onClick={() => deleteBooking(booking.id)}>
@@ -2434,7 +1974,7 @@ function App() {
                     onClick={() => setAuthMode("login")}
                     disabled={authLoading}
                   >
-                    <LogIn size={26} strokeWidth={2.2} />
+                    <div className="folder-icon">↪</div>
                     <strong>Accedi</strong>
                     <p>Hai già un account</p>
                   </button>
@@ -2445,7 +1985,7 @@ function App() {
                     onClick={() => setAuthMode("register")}
                     disabled={authLoading}
                   >
-                    <UserPlus size={26} strokeWidth={2.2} />
+                    <div className="folder-icon">＋</div>
                     <strong>Registrati</strong>
                     <p>Nuovo cliente</p>
                   </button>
@@ -2538,7 +2078,7 @@ function App() {
               <p>
                 {adminTab === "agenda" && "La vista principale del barbiere: controlla la giornata, chiama i clienti e gestisci le prenotazioni."}
                 {adminTab === "content" && "Modifica servizi, prezzi, descrizioni e immagini della Home."}
-                {adminTab === "availability" && "Chiudi giorni interi, blocca fasce orarie o apri eccezionalmente giornate normalmente chiuse."}
+                {adminTab === "availability" && "Chiudi giorni interi, blocca fasce orarie o imposta ricorrenze automatiche."}
               </p>
             </div>
 
@@ -2551,7 +2091,7 @@ function App() {
                   loadAdminBookings();
                 }}
               >
-                <CalendarDays size={28} strokeWidth={2.2} />
+                <div className="folder-icon">📅</div>
                 <strong>Agenda</strong>
                 <p>Prenotazioni</p>
               </button>
@@ -2561,7 +2101,7 @@ function App() {
                 className={adminTab === "content" ? "folder-card active" : "folder-card"}
                 onClick={() => setAdminTab("content")}
               >
-                <Scissors size={28} strokeWidth={2.2} />
+                <div className="folder-icon">✂️</div>
                 <strong>Gestione</strong>
                 <p>Servizi e foto</p>
               </button>
@@ -2574,9 +2114,9 @@ function App() {
                   loadAvailabilityBlocks();
                 }}
               >
-                <Ban size={28} strokeWidth={2.2} />
+                <div className="folder-icon">🚫</div>
                 <strong>Disponibilità</strong>
-                <p>Chiusure e aperture</p>
+                <p>Chiusure</p>
               </button>
             </div>
 
@@ -2591,278 +2131,148 @@ function App() {
               <div className="admin-panel availability-panel">
                 <div className="section-title">
                   <h3>Disponibilità</h3>
-                  <span>{closureBlocks.length} chiusure · {exceptionalOpeningBlocks.length} aperture</span>
+                  <span>{availabilityBlocks.length} blocchi attivi</span>
                 </div>
 
                 <div className="admin-help-card">
-                  <strong>Chiusure e aperture eccezionali</strong>
-                  <p>Le chiusure bloccano giorni o fasce orarie. Le aperture eccezionali riaprono una data specifica anche se esiste una chiusura ricorrente, per esempio un lunedì normalmente chiuso.</p>
+                  <strong>Chiusure e blocchi orari</strong>
+                  <p>Puoi bloccare un giorno intero, una fascia oraria specifica o creare una ricorrenza settimanale. Gli slot bloccati spariranno dalla prenotazione cliente.</p>
                 </div>
 
-                <div className="admin-segmented">
-                  <button type="button" className={availabilityTab === "closures" ? "active" : ""} onClick={() => setAvailabilityTab("closures")}>
-                    Chiusure
-                  </button>
-                  <button type="button" className={availabilityTab === "openings" ? "active" : ""} onClick={() => setAvailabilityTab("openings")}>
-                    Aperture eccezionali
-                  </button>
-                </div>
+                <form className="manual-booking-form availability-form" onSubmit={createAvailabilityBlock}>
+                  <div className="manual-booking-title">
+                    <span>Nuova chiusura</span>
+                    <strong>Blocca disponibilità</strong>
+                    <p>Scegli il tipo di blocco da applicare al calendario del salone.</p>
+                  </div>
 
-                {availabilityTab === "closures" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createAvailabilityBlock}>
-                      <div className="manual-booking-title">
-                        <span>Chiusura salone</span>
-                        <strong>Blocca disponibilità</strong>
-                        <p>Usa questa sezione per chiudere un giorno intero, una fascia oraria o una ricorrenza settimanale.</p>
-                      </div>
+                  <label>Tipo di blocco</label>
+                  <select value={availabilityMode} onChange={(e) => setAvailabilityMode(e.target.value)} disabled={availabilitySaving}>
+                    <option value="date_full_day">Giorno specifico - giornata intera</option>
+                    <option value="date_range">Giorno specifico - fascia oraria</option>
+                    <option value="recurring_full_day">Ricorrenza settimanale - giornata intera</option>
+                    <option value="recurring_range">Ricorrenza settimanale - fascia oraria</option>
+                  </select>
 
-                      <label>Tipo di blocco</label>
-                      <select value={availabilityMode} onChange={(e) => setAvailabilityMode(e.target.value)} disabled={availabilitySaving}>
-                        <option value="date_full_day">Giorno specifico - giornata intera</option>
-                        <option value="date_range">Giorno specifico - fascia oraria</option>
-                        <option value="recurring_full_day">Ricorrenza settimanale - giornata intera</option>
-                        <option value="recurring_range">Ricorrenza settimanale - fascia oraria</option>
-                      </select>
-
-                      {availabilityMode.startsWith("date") && (
-                        <>
-                          <label>Giorno</label>
-                          <input
-                            type="date"
-                            value={availabilityDate}
-                            onChange={(e) => setAvailabilityDate(e.target.value)}
-                            disabled={availabilitySaving}
-                            required
-                          />
-                        </>
-                      )}
-
-                      {availabilityMode.startsWith("recurring") && (
-                        <>
-                          <label>Giorno della settimana</label>
-                          <select value={availabilityWeekday} onChange={(e) => setAvailabilityWeekday(e.target.value)} disabled={availabilitySaving}>
-                            {weekdays.map((day) => (
-                              <option key={day.value} value={day.value}>
-                                {day.label}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      )}
-
-                      {availabilityMode.endsWith("range") && (
-                        <div className="admin-form-grid">
-                          <div>
-                            <label>Dalle</label>
-                            <select value={availabilityStartTime} onChange={(e) => setAvailabilityStartTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Inizio</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label>Alle</label>
-                            <select value={availabilityEndTime} onChange={(e) => setAvailabilityEndTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Fine</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      <label>Motivo visibile solo al barbiere</label>
-                      <input
-                        type="text"
-                        placeholder="Es. ferie, pausa, evento, chiusura straordinaria..."
-                        value={availabilityReason}
-                        onChange={(e) => setAvailabilityReason(e.target.value)}
-                        disabled={availabilitySaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={availabilitySaving}>
-                        {availabilitySaving ? "Attendi..." : "Salva chiusura"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Chiusure attive</h3>
-                      <span>{sortedAvailabilityBlocks.length}</span>
-                    </div>
-
-                    {sortedAvailabilityBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna chiusura attiva</strong>
-                        <p>Quando bloccherai giorni o orari, li vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedAvailabilityBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>{block.recurring ? "Ogni" : "Tipo"}</span>
-                                <strong>{block.recurring ? "↻" : "1x"}</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>{block.recurring ? "Ricorrenza" : "Data"}</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Blocco</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Nessun motivo inserito"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi chiusura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {availabilityTab === "openings" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createExceptionalOpening}>
-                      <div className="manual-booking-title">
-                        <span>Apertura eccezionale</span>
-                        <strong>Apri una data normalmente chiusa</strong>
-                        <p>Perfetto per aprire un lunedì, una domenica o una giornata che risulta chiusa da una ricorrenza. In quella data saranno prenotabili solo gli orari indicati qui.</p>
-                      </div>
-
-                      <label>Giorno da aprire</label>
+                  {availabilityMode.startsWith("date") && (
+                    <>
+                      <label>Giorno</label>
                       <input
                         type="date"
-                        value={openingDate}
-                        onChange={(e) => setOpeningDate(e.target.value)}
-                        disabled={openingSaving}
+                        value={availabilityDate}
+                        onChange={(e) => setAvailabilityDate(e.target.value)}
+                        disabled={availabilitySaving}
                         required
                       />
+                    </>
+                  )}
 
-                      {openingDate && hasExceptionalOpeningForDate(openingDate, availabilityBlocks) && (
-                        <div className="availability-notice limited">
-                          <div className="availability-notice-icon">i</div>
-                          <div>
-                            <strong>Esiste già almeno un’apertura eccezionale per questa data.</strong>
-                            <p>Puoi aggiungere un’altra fascia oraria, per esempio mattina e pomeriggio separati.</p>
+                  {availabilityMode.startsWith("recurring") && (
+                    <>
+                      <label>Giorno della settimana</label>
+                      <select value={availabilityWeekday} onChange={(e) => setAvailabilityWeekday(e.target.value)} disabled={availabilitySaving}>
+                        {weekdays.map((day) => (
+                          <option key={day.value} value={day.value}>
+                            {day.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+
+                  {availabilityMode.endsWith("range") && (
+                    <div className="admin-form-grid">
+                      <div>
+                        <label>Dalle</label>
+                        <select value={availabilityStartTime} onChange={(e) => setAvailabilityStartTime(e.target.value)} disabled={availabilitySaving} required>
+                          <option value="">Inizio</option>
+                          {slots.map((slot) => (
+                            <option key={slot} value={slot}>{slot}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label>Alle</label>
+                        <select value={availabilityEndTime} onChange={(e) => setAvailabilityEndTime(e.target.value)} disabled={availabilitySaving} required>
+                          <option value="">Fine</option>
+                          {slots.map((slot) => (
+                            <option key={slot} value={slot}>{slot}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <label>Motivo visibile solo al barbiere</label>
+                  <input
+                    type="text"
+                    placeholder="Es. ferie, pausa, evento, chiusura straordinaria..."
+                    value={availabilityReason}
+                    onChange={(e) => setAvailabilityReason(e.target.value)}
+                    disabled={availabilitySaving}
+                  />
+
+                  <button className="primary-cta" type="submit" disabled={availabilitySaving}>
+                    {availabilitySaving ? "Attendi..." : "Salva chiusura"}
+                  </button>
+                </form>
+
+                <div className="section-title availability-list-title">
+                  <h3>Chiusure attive</h3>
+                  <span>{sortedAvailabilityBlocks.length}</span>
+                </div>
+
+                {sortedAvailabilityBlocks.length === 0 ? (
+                  <div className="empty-card compact">
+                    <strong>Nessuna chiusura attiva</strong>
+                    <p>Quando bloccherai giorni o orari, li vedrai qui.</p>
+                  </div>
+                ) : (
+                  <div className="availability-block-list">
+                    {sortedAvailabilityBlocks.map((block) => (
+                      <article className="modern-booking-card availability-block-card" key={block.id}>
+                        <div className="modern-booking-top">
+                          <div className="modern-time-pill">
+                            <span>{block.recurring ? "Ogni" : "Tipo"}</span>
+                            <strong>{block.recurring ? "↻" : "1x"}</strong>
+                          </div>
+
+                          <div className="modern-date-block">
+                            <span>{block.recurring ? "Ricorrenza" : "Data"}</span>
+                            <strong>{formatAvailabilityBlockTitle(block)}</strong>
                           </div>
                         </div>
-                      )}
 
-                      <div className="admin-form-grid">
-                        <div>
-                          <label>Dalle</label>
-                          <select value={openingStartTime} onChange={(e) => setOpeningStartTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Apertura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
+                        <div className="modern-booking-body">
+                          <span>Blocco</span>
+                          <h3>{formatAvailabilityBlockTime(block)}</h3>
+                          <p>{block.reason || "Nessun motivo inserito"}</p>
                         </div>
 
-                        <div>
-                          <label>Alle</label>
-                          <select value={openingEndTime} onChange={(e) => setOpeningEndTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Chiusura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <label>Nota interna</label>
-                      <input
-                        type="text"
-                        placeholder="Es. apertura speciale, recupero appuntamenti, evento..."
-                        value={openingReason}
-                        onChange={(e) => setOpeningReason(e.target.value)}
-                        disabled={openingSaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={openingSaving}>
-                        {openingSaving ? "Attendi..." : "Salva apertura eccezionale"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Aperture eccezionali</h3>
-                      <span>{sortedExceptionalOpeningBlocks.length}</span>
-                    </div>
-
-                    {sortedExceptionalOpeningBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna apertura eccezionale</strong>
-                        <p>Quando aprirai una data normalmente chiusa, la vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedExceptionalOpeningBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>Open</span>
-                                <strong>✓</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>Apertura extra</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Fascia prenotabile</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Apertura eccezionale"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi apertura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
+                        <button
+                          className="admin-delete-booking-btn"
+                          type="button"
+                          disabled={availabilityDeletingId === block.id}
+                          onClick={() => deleteAvailabilityBlock(block)}
+                        >
+                          {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi chiusura"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
 
             {!adminLoading && adminTab === "content" && (
               <div className="admin-panel">
-                                <div className="admin-segmented">
+                <div className="admin-segmented">
                   <button type="button" className={adminContentTab === "services" ? "active" : ""} onClick={() => setAdminContentTab("services")}>
                     Servizi e prezzi
                   </button>
                   <button type="button" className={adminContentTab === "photos" ? "active" : ""} onClick={() => setAdminContentTab("photos")}>
                     Foto Home
-                  </button>
-                  <button type="button" className={adminContentTab === "operators" ? "active" : ""} onClick={() => {
-                    setAdminContentTab("operators");
-                    loadAdminOperators();
-                  }}>
-                    Operatori
                   </button>
                 </div>
 
@@ -3045,110 +2455,6 @@ function App() {
                     </div>
                   </>
                 )}
-                              {adminContentTab === "operators" && (
-                  <>
-                    <div className="section-title">
-                      <h3>Operatori</h3>
-                      <span>{adminOperators.length} operatori</span>
-                    </div>
-
-                    <div className="admin-help-card">
-                      <strong>Operatori del salone</strong>
-                      <p>Gli operatori attivi saranno visibili al cliente in fase di prenotazione. Ogni operatore ha la propria disponibilità sugli slot.</p>
-                    </div>
-
-                    <form className="manual-booking-form" onSubmit={createAdminOperator}>
-                      <div className="manual-booking-title">
-                        <span>Nuovo operatore</span>
-                        <strong>Aggiungi barbiere o collaboratore</strong>
-                        <p>Inserisci il nome che il cliente vedrà durante la prenotazione.</p>
-                      </div>
-
-                      <label>Nome operatore</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Marco"
-                        value={newOperatorName}
-                        onChange={(e) => setNewOperatorName(e.target.value)}
-                        disabled={operatorCreating}
-                        required
-                      />
-
-                      <label>Ruolo / specializzazione</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Barber, Hair stylist, Barba e rasatura..."
-                        value={newOperatorRole}
-                        onChange={(e) => setNewOperatorRole(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <label>Ordine</label>
-                      <input
-                        type="number"
-                        value={newOperatorSortOrder}
-                        onChange={(e) => setNewOperatorSortOrder(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={operatorCreating}>
-                        {operatorCreating ? "Creazione..." : "Aggiungi operatore"}
-                      </button>
-                    </form>
-
-                    <div className="admin-service-groups">
-                      {adminOperators.length === 0 ? (
-                        <div className="empty-card compact">
-                          <strong>Nessun operatore configurato</strong>
-                          <p>Aggiungi almeno un operatore per permettere ai clienti di prenotare.</p>
-                        </div>
-                      ) : (
-                        adminOperators.map((item) => (
-                          <article className="admin-edit-card" key={item.id}>
-                            <div className="admin-card-head">
-                              <div className="admin-card-icon">{String(item.name || "O").charAt(0).toUpperCase()}</div>
-                              <div>
-                                <span>{item.active ? "Attivo" : "Non attivo"}</span>
-                                <strong>{item.name || "Operatore senza nome"}</strong>
-                                <p>{item.role || "Nessun ruolo inserito"}</p>
-                              </div>
-                            </div>
-
-                            <div className="admin-form-grid">
-                              <div>
-                                <label>Nome</label>
-                                <input type="text" value={item.name || ""} onChange={(e) => updateAdminOperatorField(item.id, "name", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ruolo</label>
-                                <input type="text" value={item.role || ""} onChange={(e) => updateAdminOperatorField(item.id, "role", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ordine</label>
-                                <input type="number" value={item.sort_order || 0} onChange={(e) => updateAdminOperatorField(item.id, "sort_order", e.target.value)} />
-                              </div>
-                            </div>
-
-                            <label className="admin-toggle-row">
-                              <input type="checkbox" checked={Boolean(item.active)} onChange={(e) => updateAdminOperatorField(item.id, "active", e.target.checked)} />
-                              <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
-                            </label>
-
-                            <button className="primary-cta" type="button" disabled={operatorSavingId === item.id} onClick={() => saveAdminOperator(item)}>
-                              {operatorSavingId === item.id ? "Salvataggio..." : "Salva operatore"}
-                            </button>
-
-                            <button className="admin-delete-booking-btn" type="button" disabled={operatorDeletingId === item.id} onClick={() => deleteAdminOperator(item)}>
-                              {operatorDeletingId === item.id ? "Eliminazione..." : "Elimina operatore"}
-                            </button>
-                          </article>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
@@ -3210,26 +2516,7 @@ function App() {
                       onChange={(e) => setManualService(e.target.value)}
                       disabled={manualBookingLoading}
                     />
-                                          <label>Operatore</label>
-                    <select
-                      value={manualOperatorId}
-                      onChange={(e) => {
-                        setManualOperatorId(e.target.value);
-                        setManualTime("");
-                      }}
-                      disabled={manualBookingLoading || activeOperators.length === 0}
-                      required
-                    >
-                      <option value="">
-                        {activeOperators.length > 0 ? "Scegli operatore" : "Nessun operatore disponibile"}
-                      </option>
-                      {activeOperators.map((operator) => (
-                        <option key={operator.id} value={operator.id}>
-                          {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    
+
                     <div className="admin-form-grid">
                       <div>
                         <label>Giorno</label>
@@ -3314,8 +2601,7 @@ function App() {
 
                               <div className="modern-booking-body">
                                 <span>Servizio</span>
-                               <h3>{booking.service || "Prenotazione telefonica"}</h3>
-                                <p>Operatore: {booking.operator_name || "Non assegnato"}</p>
+                                <h3>{booking.service || "Prenotazione telefonica"}</h3>
                                 <a className="phone-link" href={`tel:${booking.phone}`}>
                                   {booking.phone}
                                 </a>
@@ -3359,7 +2645,7 @@ function App() {
 
             <div className="info-mosaic">
               <div className="mosaic-card wide">
-                <MapPin size={24} strokeWidth={2.2} />
+                <span>📍</span>
                 <div>
                   <strong>Via Roma 25</strong>
                   <p>Palermo</p>
@@ -3367,19 +2653,19 @@ function App() {
               </div>
 
               <div className="mosaic-card">
-                <Clock3 size={24} strokeWidth={2.2} />
-                <strong>lun - Sab</strong>
+                <span>🕘</span>
+                <strong>Lun - Sab</strong>
                 <p>09:00 - 18:30</p>
               </div>
 
               <div className="mosaic-card">
-                <Scissors size={24} strokeWidth={2.2} />
+                <span>✂️</span>
                 <strong>4 aree</strong>
                 <p>Taglio, barba, estetica, tecnico</p>
               </div>
 
               <div className="mosaic-card wide dark">
-                <Phone size={24} strokeWidth={2.2} />
+                <span>📞</span>
                 <div>
                   <strong>333 123 4567</strong>
                   <p>Contatto diretto del salone</p>
@@ -3387,7 +2673,14 @@ function App() {
               </div>
             </div>
 
-            
+            <div className="info-service-strip">
+              {serviceCategories.map((group) => (
+                <div key={group.category}>
+                  <span>{group.icon}</span>
+                  <strong>{group.category}</strong>
+                </div>
+              ))}
+            </div>
           </section>
         )}
       </main>
@@ -3434,7 +2727,6 @@ function App() {
             <div className="delete-booking-preview">
               <strong>{adminBookingToDelete.name}</strong>
               <p>{adminBookingToDelete.service || "Prenotazione telefonica"}</p>
-              <p>Operatore: {adminBookingToDelete.operator_name || "Non assegnato"}</p>
               <span>{formatLongDate(adminBookingToDelete.date)} alle {adminBookingToDelete.time}</span>
             </div>
 
@@ -3591,50 +2883,46 @@ function App() {
       )}
 
       <nav className="bottom-nav four-items">
-  <button
-    className={activePage === "home" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("home");
-    }}
-  >
-    <Home size={18} strokeWidth={2.4} />
-    Home
-  </button>
+        <button
+          className={activePage === "home" ? "active" : ""}
+          onClick={() => {
+            setShowProfileMenu(false);
+            setActivePage("home");
+          }}
+        >
+          <span>⌂</span> Home
+        </button>
 
-  <button
-    className={activePage === "book" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("book");
-    }}
-  >
-    <CalendarPlus size={18} strokeWidth={2.4} />
-    Prenota
-  </button>
+        <button
+          className={activePage === "book" ? "active" : ""}
+          onClick={() => {
+            setShowProfileMenu(false);
+            setActivePage("book");
+          }}
+        >
+          <span>＋</span> Prenota
+        </button>
 
-  <button
-    className={activePage === "my-bookings" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("my-bookings");
-    }}
-  >
-    <CalendarCheck size={18} strokeWidth={2.4} />
-    Prenotazioni
-  </button>
+        <button
+          className={activePage === "my-bookings" ? "active" : ""}
+          onClick={() => {
+            setShowProfileMenu(false);
+            setActivePage("my-bookings");
+          }}
+        >
+          <span>◷</span> Prenotazioni
+        </button>
 
-  <button
-    className={activePage === "info" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("info");
-    }}
-  >
-    <Info size={18} strokeWidth={2.4} />
-    Salone
-  </button>
-</nav>
+        <button
+          className={activePage === "info" ? "active" : ""}
+          onClick={() => {
+            setShowProfileMenu(false);
+            setActivePage("info");
+          }}
+        >
+          <span>i</span> Salone
+        </button>
+      </nav>
     </div>
   );
 }

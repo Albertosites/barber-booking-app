@@ -1,41 +1,14 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Home,
-  CalendarPlus,
-  CalendarCheck,
-  Info,
-  UserRound,
-  LogIn,
-  UserPlus,
-  CalendarDays,
-  Scissors,
-  Ban,
-  MapPin,
-  Clock3,
-  Phone,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
 
 const SHOP_ID = "0c0f8c8e-6b93-45a0-a97b-688394b769a3";
-
-const OPENING_REASON_PREFIX = "__EXCEPTIONAL_OPENING__:";
 
 const slots = [
   "09:00", "09:30", "10:00", "10:30",
   "11:00", "11:30", "12:00", "12:30",
   "15:00", "15:30", "16:00", "16:30",
   "17:00", "17:30", "18:00", "18:30",
-];
-
-const weekdays = [
-  { value: 0, label: "Domenica" },
-  { value: 1, label: "Lunedì" },
-  { value: 2, label: "Martedì" },
-  { value: 3, label: "Mercoledì" },
-  { value: 4, label: "Giovedì" },
-  { value: 5, label: "Venerdì" },
-  { value: 6, label: "Sabato" },
 ];
 
 const fallbackGallery = [
@@ -102,238 +75,6 @@ function formatLongDate(dateString) {
   });
 }
 
-function isEmailProbablyValid(email) {
-  const cleanEmail = email.trim().toLowerCase();
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail)) {
-    return false;
-  }
-
-  const wrongEndings = [
-    ".con",
-    ".cim",
-    ".vom",
-    ".comm",
-    ".itn",
-    ".nett",
-    ".orrg",
-  ];
-
-  return !wrongEndings.some((ending) => cleanEmail.endsWith(ending));
-}
-
-function getWeekdayFromDate(dateString) {
-  const parsedDate = parseLocalDate(dateString);
-
-  if (!parsedDate) return null;
-
-  return parsedDate.getDay();
-}
-
-function getWeekdayLabel(weekday) {
-  const found = weekdays.find((item) => item.value === Number(weekday));
-
-  return found?.label || "Giorno";
-}
-
-function timeToMinutes(timeString) {
-  if (!timeString || typeof timeString !== "string") return null;
-
-  const cleanTime = timeString.slice(0, 5);
-  const [hours, minutes] = cleanTime.split(":").map(Number);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-
-  return hours * 60 + minutes;
-}
-
-function isExceptionalOpeningBlock(block) {
-  return String(block.reason || "").startsWith(OPENING_REASON_PREFIX);
-}
-
-function getCleanAvailabilityReason(block) {
-  const reason = String(block.reason || "");
-
-  if (reason.startsWith(OPENING_REASON_PREFIX)) {
-    return reason.replace(OPENING_REASON_PREFIX, "").trim();
-  }
-
-  return reason;
-}
-
-function getExceptionalOpeningsForDate(dateString, availabilityBlocks) {
-  if (!dateString) return [];
-
-  return availabilityBlocks.filter((block) => {
-    if (!block.active) return false;
-    if (!isExceptionalOpeningBlock(block)) return false;
-
-    return !block.recurring && block.block_date === dateString;
-  });
-}
-
-function isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks) {
-  const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length === 0) return false;
-
-  return exceptionalOpenings.some((block) => {
-    const startMinutes = timeToMinutes(block.start_time);
-    const endMinutes = timeToMinutes(block.end_time);
-
-    if (startMinutes === null || endMinutes === null || slotMinutes === null) {
-      return false;
-    }
-
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  });
-}
-
-function hasExceptionalOpeningForDate(dateString, availabilityBlocks) {
-  return getExceptionalOpeningsForDate(dateString, availabilityBlocks).length > 0;
-}
-function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
-  if (!dateString) return false;
-
-  const selectedWeekday = getWeekdayFromDate(dateString);
-  const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return !isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks);
-  }
-
-  return availabilityBlocks.some((block) => {
-    if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
-
-    const appliesToDate =
-      (!block.recurring && block.block_date === dateString) ||
-      (block.recurring && Number(block.weekday) === selectedWeekday);
-
-    if (!appliesToDate) return false;
-
-    if (block.full_day) return true;
-
-    const startMinutes = timeToMinutes(block.start_time);
-    const endMinutes = timeToMinutes(block.end_time);
-
-    if (startMinutes === null || endMinutes === null || slotMinutes === null) {
-      return false;
-    }
-
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  });
-}
-function isOperatorBookedAtSlot(bookings, dateString, slot, operatorId) {
-  if (!dateString || !slot || !operatorId) return false;
-
-  return bookings.some((booking) => {
-    if (booking.date !== dateString || booking.time !== slot) return false;
-
-    if (!booking.operator_id) return true;
-
-    return booking.operator_id === operatorId;
-  });
-}
-
-function hasAtLeastOneOperatorAvailableAtSlot(bookings, dateString, slot, activeOperators) {
-  if (!dateString || !slot) return false;
-  if (activeOperators.length === 0) return false;
-
-  return activeOperators.some((operator) => {
-    return !isOperatorBookedAtSlot(bookings, dateString, slot, operator.id);
-  });
-}
-
-function formatAvailabilityBlockTitle(block) {
-  if (isExceptionalOpeningBlock(block)) {
-    return formatLongDate(block.block_date);
-  }
-
-  if (block.recurring) {
-    return `Ogni ${getWeekdayLabel(block.weekday)}`;
-  }
-
-  return formatLongDate(block.block_date);
-}
-
-function formatAvailabilityBlockTime(block) {
-  if (block.full_day) return "Giornata intera";
-
-  return `${String(block.start_time || "").slice(0, 5)} → ${String(block.end_time || "").slice(0, 5)}`;
-}
-
-function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableSlots) {
-  if (!dateString) return null;
-
-  const selectedWeekday = getWeekdayFromDate(dateString);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return {
-      type: "limited",
-      title: "Apertura eccezionale attiva per questa data.",
-      text: "Il salone normalmente potrebbe risultare chiuso, ma per questo giorno sono disponibili solo gli orari aperti manualmente dal barbiere.",
-    };
-  }
-
-  const matchingBlocks = availabilityBlocks.filter((block) => {
-    if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
-
-    return (
-      (!block.recurring && block.block_date === dateString) ||
-      (block.recurring && Number(block.weekday) === selectedWeekday)
-    );
-  });
-
-  const recurringFullDay = matchingBlocks.find(
-    (block) => block.recurring && block.full_day
-  );
-
-  if (recurringFullDay) {
-    return {
-      type: "closed",
-      title: `Il salone è chiuso tutti i ${getWeekdayLabel(selectedWeekday).toLowerCase()}.`,
-      text: "Scegli un altro giorno disponibile per completare la prenotazione.",
-    };
-  }
-
-  const dateFullDay = matchingBlocks.find(
-    (block) => !block.recurring && block.full_day
-  );
-
-  if (dateFullDay) {
-    return {
-      type: "closed",
-      title: "Il salone è chiuso per tutta la giornata selezionata.",
-      text: "Scegli un’altra data per vedere gli orari disponibili.",
-    };
-  }
-
-  const hasRangeBlocks = matchingBlocks.some((block) => !block.full_day);
-
-  if (hasRangeBlocks) {
-    return {
-      type: "limited",
-      title: "In questo giorno alcune fasce orarie non sono disponibili.",
-      text: "Gli orari mostrati sotto sono già filtrati in base alle disponibilità del salone.",
-    };
-  }
-
-  if (availableSlots.length === 0) {
-    return {
-      type: "closed",
-      title: "Non ci sono orari disponibili per questa data.",
-      text: "Prova a selezionare un altro giorno.",
-    };
-  }
-
-  return null;
-}
-
 function App() {
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -348,44 +89,19 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState("agenda");
   const [adminContentTab, setAdminContentTab] = useState("services");
-  const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
   const [adminImages, setAdminImages] = useState([]);
-  const [adminOperators, setAdminOperators] = useState([]);
-  const [operators, setOperators] = useState([]);
   const [adminBookings, setAdminBookings] = useState([]);
-  const [availabilityBlocks, setAvailabilityBlocks] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [uploadingImageId, setUploadingImageId] = useState("");
   const [adminBookingToDelete, setAdminBookingToDelete] = useState(null);
   const [adminDeleteLoading, setAdminDeleteLoading] = useState(false);
-  const [operatorSavingId, setOperatorSavingId] = useState("");
-  const [operatorDeletingId, setOperatorDeletingId] = useState("");
-  const [newOperatorName, setNewOperatorName] = useState("");
-  const [newOperatorRole, setNewOperatorRole] = useState("");
-  const [newOperatorSortOrder, setNewOperatorSortOrder] = useState("0");
-  const [operatorCreating, setOperatorCreating] = useState(false);
-  const [availabilityMode, setAvailabilityMode] = useState("date_full_day");
-  const [availabilityDate, setAvailabilityDate] = useState("");
-  const [availabilityWeekday, setAvailabilityWeekday] = useState("1");
-  const [availabilityStartTime, setAvailabilityStartTime] = useState("");
-  const [availabilityEndTime, setAvailabilityEndTime] = useState("");
-  const [availabilityReason, setAvailabilityReason] = useState("");
-  const [availabilitySaving, setAvailabilitySaving] = useState(false);
-  const [availabilityDeletingId, setAvailabilityDeletingId] = useState("");
-
-  const [openingDate, setOpeningDate] = useState("");
-  const [openingStartTime, setOpeningStartTime] = useState("");
-  const [openingEndTime, setOpeningEndTime] = useState("");
-  const [openingReason, setOpeningReason] = useState("");
-  const [openingSaving, setOpeningSaving] = useState(false);
 
   const [showManualBookingForm, setShowManualBookingForm] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
   const [manualService, setManualService] = useState("");
-  const [manualOperatorId, setManualOperatorId] = useState("");
   const [manualDate, setManualDate] = useState("");
   const [manualTime, setManualTime] = useState("");
   const [manualBookingLoading, setManualBookingLoading] = useState(false);
@@ -398,18 +114,11 @@ function App() {
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newFullName, setNewFullName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
   const [credentialsLoading, setCredentialsLoading] = useState(false);
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
   const cameraInputRefs = useRef({});
   const galleryInputRefs = useRef({});
-  const authSubmitLockRef = useRef(false);
-  const bookingSubmitLockRef = useRef(false);
-  const manualBookingSubmitLockRef = useRef(false);
-  const availabilitySubmitLockRef = useRef(false);
-  const openingSubmitLockRef = useRef(false);
 
   const [authMode, setAuthMode] = useState("login");
   const [authFullName, setAuthFullName] = useState("");
@@ -419,7 +128,6 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
 
   const [service, setService] = useState("");
-  const [operatorId, setOperatorId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [bookings, setBookings] = useState([]);
@@ -431,14 +139,6 @@ function App() {
   }, [serviceCategories]);
 
   const selectedService = allServices.find((item) => item.name === service);
-
-  const selectedOperator = operators.find((item) => item.id === operatorId);
-
-  const selectedManualOperator = operators.find((item) => item.id === manualOperatorId);
-
-  const activeOperators = useMemo(() => {
-    return operators.filter((operator) => operator.active !== false);
-  }, [operators]);
 
   const today = useMemo(() => {
     return getTodayString();
@@ -496,83 +196,17 @@ function App() {
     return Object.keys(groupedAdminServices).sort();
   }, [groupedAdminServices]);
 
-  const closureBlocks = useMemo(() => {
-    return availabilityBlocks.filter((block) => !isExceptionalOpeningBlock(block));
-  }, [availabilityBlocks]);
+  const availableSlots = useMemo(() => {
+    return slots.filter(
+      (slot) => !bookings.some((b) => b.date === date && b.time === slot)
+    );
+  }, [bookings, date]);
 
-  const exceptionalOpeningBlocks = useMemo(() => {
-    return availabilityBlocks.filter((block) => isExceptionalOpeningBlock(block));
-  }, [availabilityBlocks]);
-
-  const sortedAvailabilityBlocks = useMemo(() => {
-    return [...closureBlocks].sort((a, b) => {
-      if (a.recurring !== b.recurring) {
-        return a.recurring ? 1 : -1;
-      }
-
-      const first = a.block_date || String(a.weekday || "");
-      const second = b.block_date || String(b.weekday || "");
-
-      return String(first).localeCompare(String(second));
-    });
-  }, [closureBlocks]);
-
-  const sortedExceptionalOpeningBlocks = useMemo(() => {
-    return [...exceptionalOpeningBlocks].sort((a, b) => {
-      const first = a.block_date || "";
-      const second = b.block_date || "";
-
-      if (first !== second) {
-        return String(first).localeCompare(String(second));
-      }
-
-      return String(a.start_time || "").localeCompare(String(b.start_time || ""));
-    });
-  }, [exceptionalOpeningBlocks]);
-
-   const availableSlots = useMemo(() => {
-    return slots.filter((slot) => {
-      if (isSlotBlockedByAvailability(slot, date, availabilityBlocks)) {
-        return false;
-      }
-
-      if (operatorId) {
-        return !isOperatorBookedAtSlot(bookings, date, slot, operatorId);
-      }
-
-      return hasAtLeastOneOperatorAvailableAtSlot(bookings, date, slot, activeOperators);
-    });
-  }, [activeOperators, availabilityBlocks, bookings, date, operatorId]);
-
-  const bookingAvailabilityNotice = useMemo(() => {
-    return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots);
-  }, [availabilityBlocks, availableSlots, date]);
-
-   const manualAvailableSlots = useMemo(() => {
-    return slots.filter((slot) => {
-      if (isSlotBlockedByAvailability(slot, manualDate, availabilityBlocks)) {
-        return false;
-      }
-
-      if (manualOperatorId) {
-        return !isOperatorBookedAtSlot(bookings, manualDate, slot, manualOperatorId);
-      }
-
-      return hasAtLeastOneOperatorAvailableAtSlot(bookings, manualDate, slot, activeOperators);
-    });
-  }, [activeOperators, availabilityBlocks, bookings, manualDate, manualOperatorId]);
-
-  const avatarLabel = useMemo(() => {
-    if (!session?.user) return null;
-
-    const cleanName = userProfile?.full_name?.trim();
-
-    if (cleanName) {
-      return cleanName.charAt(0).toUpperCase();
-    }
-
-    return session.user.email?.charAt(0)?.toUpperCase() || "U";
-  }, [session, userProfile]);
+  const manualAvailableSlots = useMemo(() => {
+    return slots.filter(
+      (slot) => !bookings.some((b) => b.date === manualDate && b.time === slot)
+    );
+  }, [bookings, manualDate]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -594,12 +228,10 @@ function App() {
     };
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     loadServices();
     loadHomeImages();
     loadBookings();
-    loadAvailabilityBlocks();
-    loadOperators();
   }, []);
 
   useEffect(() => {
@@ -608,8 +240,6 @@ function App() {
       loadMyBookings(session.user.id);
       checkAdmin(session.user.id);
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   useEffect(() => {
@@ -628,30 +258,6 @@ function App() {
     return () => clearInterval(timer);
   }, [gallery.length]);
 
-  useEffect(() => {
-    if (!showProfileMenu) return;
-
-    function handleClickOutside(event) {
-      if (!event.target.closest(".profile-wrapper")) {
-        setShowProfileMenu(false);
-      }
-    }
-
-    function handleScroll() {
-      setShowProfileMenu(false);
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    window.addEventListener("scroll", handleScroll, true);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      window.removeEventListener("scroll", handleScroll, true);
-    };
-  }, [showProfileMenu]);
-
   function goToImage(index) {
     setGalleryIndex(index);
   }
@@ -663,8 +269,6 @@ function App() {
   function openCredentialsModal() {
     setNewEmail(session?.user?.email || "");
     setNewPassword("");
-    setNewFullName(userProfile?.full_name || "");
-    setNewPhone(userProfile?.phone || "");
     setShowCredentialsModal(true);
     setShowProfileMenu(false);
   }
@@ -685,29 +289,6 @@ function App() {
       console.error(error);
       setUserProfile(null);
       return null;
-    }
-
-    if (data?.full_name && data?.phone) {
-      setUserProfile(data);
-      return data;
-    }
-
-    const authName = session?.user?.user_metadata?.full_name?.trim() || "";
-    const authPhone = session?.user?.user_metadata?.phone?.trim() || "";
-    const authEmail = session?.user?.email || "";
-
-    if (authName && authPhone && authEmail) {
-      const saved = await saveUserProfile(userId, authEmail, authName, authPhone);
-
-      if (saved) {
-        const recoveredProfile = {
-          full_name: authName,
-          phone: authPhone,
-        };
-
-        setUserProfile(recoveredProfile);
-        return recoveredProfile;
-      }
     }
 
     setUserProfile(data || null);
@@ -775,16 +356,13 @@ function App() {
   }
 
   async function confirmJoinShop() {
-    if (joinShopLoading) return;
-
     setJoinShopLoading(true);
 
     const joined = await joinCurrentShop();
 
-    if (!joined) {
-      setJoinShopLoading(false);
-      return;
-    }
+    setJoinShopLoading(false);
+
+    if (!joined) return;
 
     setShowJoinShopPopup(false);
 
@@ -796,13 +374,10 @@ function App() {
       await checkAdmin(data.session.user.id);
     }
 
-    setJoinShopLoading(false);
     alert("Account collegato correttamente a questo salone.");
   }
 
   async function cancelJoinShop() {
-    if (joinShopLoading) return;
-
     setShowJoinShopPopup(false);
     await logout();
   }
@@ -824,25 +399,24 @@ function App() {
     setIsAdmin(data?.role === "admin");
   }
 
- async function deleteOldBookings() {
-  const { error } = await supabase.rpc("delete_old_bookings");
+  async function deleteOldBookings() {
+    const { error } = await supabase.rpc("delete_old_bookings");
 
-  if (error) {
-    console.warn("Pulizia prenotazioni vecchie non eseguita:", error);
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare le prenotazioni vecchie.");
+    }
   }
-}
 
   async function loadAdminData() {
     setAdminLoading(true);
 
     await deleteOldBookings();
 
-        await Promise.all([
+    await Promise.all([
       loadAdminServices(),
       loadAdminImages(),
-      loadAdminOperators(),
       loadAdminBookings(),
-      loadAvailabilityBlocks(),
     ]);
 
     setAdminLoading(false);
@@ -879,62 +453,27 @@ function App() {
 
     setAdminImages(data || []);
   }
-  async function loadOperators() {
-    const { data, error } = await supabase
-      .from("operators")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .eq("active", true)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
 
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento degli operatori.");
-      return;
-    }
-
-    setOperators(data || []);
-  }
-
-  async function loadAdminOperators() {
-    const { data, error } = await supabase
-      .from("operators")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento degli operatori admin.");
-      return;
-    }
-
-    setAdminOperators(data || []);
-  }
-  
   async function loadAdminBookings() {
-    await deleteOldBookings();
+  await deleteOldBookings();
 
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .gte("date", getTodayString())
-      .order("date", { ascending: true })
-      .order("time", { ascending: true });
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("shop_id", SHOP_ID)
+    .gte("date", getTodayString())
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
 
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento agenda barbiere.");
-      return;
-    }
-
-    setAdminBookings(data || []);
-    setBookings(data || []);
+  if (error) {
+    console.error(error);
+    alert("Errore nel caricamento agenda barbiere.");
+    return;
   }
 
+  setAdminBookings(data || []);
+  setBookings(data || []);
+}
   function updateAdminServiceField(id, field, value) {
     setAdminServices((current) =>
       current.map((item) =>
@@ -950,13 +489,7 @@ function App() {
       )
     );
   }
-  function updateAdminOperatorField(id, field, value) {
-    setAdminOperators((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
-  }
+
   async function saveAdminService(item) {
     const { error } = await supabase
       .from("services")
@@ -1002,121 +535,12 @@ function App() {
       alert("Non è stato possibile salvare l’immagine.");
       return;
     }
- 
+
     await loadHomeImages();
     await loadAdminImages();
     alert("Immagine aggiornata.");
   }
-  async function createAdminOperator(e) {
-    e.preventDefault();
 
-    if (operatorCreating) return;
-
-    const cleanName = newOperatorName.trim();
-    const cleanRole = newOperatorRole.trim();
-
-    if (!cleanName) {
-      alert("Inserisci il nome dell’operatore.");
-      return;
-    }
-
-    setOperatorCreating(true);
-
-    const { error } = await supabase
-      .from("operators")
-      .insert([
-        {
-          shop_id: SHOP_ID,
-          name: cleanName,
-          role: cleanRole || null,
-          active: true,
-          sort_order: Number(newOperatorSortOrder || 0),
-        },
-      ]);
-
-    setOperatorCreating(false);
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile creare l’operatore.");
-      return;
-    }
-
-    setNewOperatorName("");
-    setNewOperatorRole("");
-    setNewOperatorSortOrder("0");
-
-    await loadOperators();
-    await loadAdminOperators();
-
-    alert("Operatore aggiunto.");
-  }
-
-  async function saveAdminOperator(item) {
-    const cleanName = String(item.name || "").trim();
-
-    if (!cleanName) {
-      alert("Il nome dell’operatore non può essere vuoto.");
-      return;
-    }
-
-    setOperatorSavingId(item.id);
-
-    const { error } = await supabase
-      .from("operators")
-      .update({
-        name: cleanName,
-        role: item.role || null,
-        active: Boolean(item.active),
-        sort_order: Number(item.sort_order || 0),
-      })
-      .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
-
-    setOperatorSavingId("");
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile salvare l’operatore.");
-      return;
-    }
-
-    await loadOperators();
-    await loadAdminOperators();
-    await loadBookings();
-    await loadAdminBookings();
-
-    alert("Operatore aggiornato.");
-  }
-
-  async function deleteAdminOperator(item) {
-    const confirmDelete = window.confirm(
-      "Vuoi eliminare questo operatore? Se ha prenotazioni già associate, è meglio disattivarlo invece di eliminarlo."
-    );
-
-    if (!confirmDelete) return;
-
-    setOperatorDeletingId(item.id);
-
-    const { error } = await supabase
-      .from("operators")
-      .delete()
-      .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
-
-    setOperatorDeletingId("");
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile eliminare l’operatore. Se ha prenotazioni associate, disattivalo invece di eliminarlo.");
-      return;
-    }
-
-    await loadOperators();
-    await loadAdminOperators();
-
-    alert("Operatore eliminato.");
-  }
   async function uploadAdminHomeImage(item, file) {
     if (!file) return;
 
@@ -1241,198 +665,6 @@ function App() {
     setServiceCategories(groupedServices);
   }
 
-  async function loadAvailabilityBlocks() {
-    const { data, error } = await supabase
-      .from("availability_blocks")
-      .select("*")
-      .eq("shop_id", SHOP_ID)
-      .eq("active", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error(error);
-      alert("Errore nel caricamento delle disponibilità del salone.");
-      return;
-    }
-
-    setAvailabilityBlocks(data || []);
-  }
-
-  async function createAvailabilityBlock(e) {
-    e.preventDefault();
-
-    if (availabilitySubmitLockRef.current || availabilitySaving) return;
-
-    if (!session?.user || !isAdmin) {
-      alert("Solo un admin può modificare le disponibilità.");
-      return;
-    }
-
-    const isRecurring = availabilityMode.startsWith("recurring");
-    const isFullDay = availabilityMode.endsWith("full_day");
-    const cleanReason = availabilityReason.trim();
-
-    if (!isRecurring && !availabilityDate) {
-      alert("Scegli il giorno da bloccare.");
-      return;
-    }
-
-    if (!isFullDay && (!availabilityStartTime || !availabilityEndTime)) {
-      alert("Scegli orario di inizio e fine.");
-      return;
-    }
-
-    if (!isFullDay && timeToMinutes(availabilityStartTime) >= timeToMinutes(availabilityEndTime)) {
-      alert("L’orario di fine deve essere successivo all’orario di inizio.");
-      return;
-    }
-
-    availabilitySubmitLockRef.current = true;
-    setAvailabilitySaving(true);
-
-    const payload = {
-      shop_id: SHOP_ID,
-      block_date: isRecurring ? null : availabilityDate,
-      weekday: isRecurring ? Number(availabilityWeekday) : null,
-      start_time: isFullDay ? null : availabilityStartTime,
-      end_time: isFullDay ? null : availabilityEndTime,
-      full_day: isFullDay,
-      recurring: isRecurring,
-      active: true,
-      reason: cleanReason || null,
-      created_by: session.user.id,
-    };
-
-    const { error } = await supabase
-      .from("availability_blocks")
-      .insert([payload]);
-
-    if (error) {
-      availabilitySubmitLockRef.current = false;
-      setAvailabilitySaving(false);
-      console.error(error);
-      alert("Non è stato possibile salvare la chiusura.");
-      return;
-    }
-
-    setAvailabilityDate("");
-    setAvailabilityStartTime("");
-    setAvailabilityEndTime("");
-    setAvailabilityReason("");
-
-    await loadAvailabilityBlocks();
-    await loadBookings();
-
-    if (isAdmin) {
-      await loadAdminBookings();
-    }
-
-    availabilitySubmitLockRef.current = false;
-    setAvailabilitySaving(false);
-    alert("Disponibilità aggiornata.");
-  }
-
-  async function createExceptionalOpening(e) {
-    e.preventDefault();
-
-    if (openingSubmitLockRef.current || openingSaving) return;
-
-    if (!session?.user || !isAdmin) {
-      alert("Solo un admin può creare aperture eccezionali.");
-      return;
-    }
-
-    const cleanReason = openingReason.trim();
-
-    if (!openingDate) {
-      alert("Scegli il giorno da aprire eccezionalmente.");
-      return;
-    }
-
-    if (!openingStartTime || !openingEndTime) {
-      alert("Scegli orario di apertura e chiusura.");
-      return;
-    }
-
-    if (timeToMinutes(openingStartTime) >= timeToMinutes(openingEndTime)) {
-      alert("L’orario di fine deve essere successivo all’orario di inizio.");
-      return;
-    }
-
-    openingSubmitLockRef.current = true;
-    setOpeningSaving(true);
-
-    const payload = {
-      shop_id: SHOP_ID,
-      block_date: openingDate,
-      weekday: null,
-      start_time: openingStartTime,
-      end_time: openingEndTime,
-      full_day: false,
-      recurring: false,
-      active: true,
-      reason: `${OPENING_REASON_PREFIX}${cleanReason || "Apertura eccezionale"}`,
-      created_by: session.user.id,
-    };
-
-    const { error } = await supabase
-      .from("availability_blocks")
-      .insert([payload]);
-
-    if (error) {
-      openingSubmitLockRef.current = false;
-      setOpeningSaving(false);
-      console.error(error);
-      alert("Non è stato possibile salvare l’apertura eccezionale.");
-      return;
-    }
-
-    setOpeningDate("");
-    setOpeningStartTime("");
-    setOpeningEndTime("");
-    setOpeningReason("");
-
-    await loadAvailabilityBlocks();
-    await loadBookings();
-
-    if (isAdmin) {
-      await loadAdminBookings();
-    }
-
-    openingSubmitLockRef.current = false;
-    setOpeningSaving(false);
-    alert("Apertura eccezionale salvata.");
-  }
-
-  async function deleteAvailabilityBlock(block) {
-    const confirmDelete = window.confirm(
-      isExceptionalOpeningBlock(block)
-        ? "Vuoi rimuovere questa apertura eccezionale?"
-        : "Vuoi rimuovere questa chiusura?"
-    );
-
-    if (!confirmDelete) return;
-
-    setAvailabilityDeletingId(block.id);
-
-    const { error } = await supabase
-      .from("availability_blocks")
-      .delete()
-      .eq("id", block.id)
-      .eq("shop_id", SHOP_ID);
-
-    setAvailabilityDeletingId("");
-
-    if (error) {
-      console.error(error);
-      alert("Non è stato possibile eliminare questa disponibilità.");
-      return;
-    }
-
-    await loadAvailabilityBlocks();
-    alert(isExceptionalOpeningBlock(block) ? "Apertura eccezionale rimossa." : "Chiusura rimossa.");
-  }
-
   async function loadBookings() {
     const { data, error } = await supabase
       .from("bookings")
@@ -1478,11 +710,6 @@ function App() {
       return;
     }
 
-    if (!isEmailProbablyValid(cleanEmail)) {
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
-      return;
-    }
-
     const redirectUrl =
       window.location.hostname === "localhost"
         ? window.location.origin
@@ -1507,22 +734,11 @@ function App() {
 
   async function handleAuth(e) {
     e.preventDefault();
-
-    if (authSubmitLockRef.current || authLoading) return;
-
-    authSubmitLockRef.current = true;
     setAuthLoading(true);
 
     const cleanEmail = authEmail.trim();
     const cleanName = authFullName.trim();
     const cleanPhone = authPhone.trim();
-
-    if (!isEmailProbablyValid(cleanEmail)) {
-      authSubmitLockRef.current = false;
-      setAuthLoading(false);
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
-      return;
-    }
 
     if (authMode === "login") {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -1530,9 +746,9 @@ function App() {
         password: authPassword,
       });
 
+      setAuthLoading(false);
+
       if (error) {
-        authSubmitLockRef.current = false;
-        setAuthLoading(false);
         alert("Accesso non riuscito. Controlla email e password.");
         console.error(error);
         return;
@@ -1545,9 +761,6 @@ function App() {
 
       await loadUserProfile(data.user.id);
 
-      authSubmitLockRef.current = false;
-      setAuthLoading(false);
-
       if (!member) {
         setShowJoinShopPopup(true);
       }
@@ -1556,7 +769,6 @@ function App() {
     }
 
     if (!cleanName || !cleanPhone) {
-      authSubmitLockRef.current = false;
       setAuthLoading(false);
       alert("Inserisci nome e telefono per completare la registrazione.");
       return;
@@ -1568,6 +780,8 @@ function App() {
     });
 
     if (!loginError) {
+      setAuthLoading(false);
+
       const member = await isCurrentShopMember(loginData.user.id);
 
       await saveUserProfile(loginData.user.id, cleanEmail, cleanName, cleanPhone);
@@ -1576,9 +790,6 @@ function App() {
       setAuthPhone("");
       setAuthEmail("");
       setAuthPassword("");
-
-      authSubmitLockRef.current = false;
-      setAuthLoading(false);
 
       if (!member) {
         setShowJoinShopPopup(true);
@@ -1600,9 +811,9 @@ function App() {
       },
     });
 
+    setAuthLoading(false);
+
     if (signUpError) {
-      authSubmitLockRef.current = false;
-      setAuthLoading(false);
       console.error(signUpError);
       alert("Non è stato possibile completare l’accesso. Se hai già un account, usa la scheda Accedi.");
       return;
@@ -1618,15 +829,10 @@ function App() {
       await joinCurrentShop();
       await loadMyBookings(signUpData.session.user.id);
       await checkAdmin(signUpData.session.user.id);
-
-      authSubmitLockRef.current = false;
-      setAuthLoading(false);
       alert("Registrazione completata.");
       return;
     }
 
-    authSubmitLockRef.current = false;
-    setAuthLoading(false);
     alert("Registrazione completata. Controlla la tua email se è richiesta la conferma.");
     setAuthMode("login");
   }
@@ -1636,19 +842,6 @@ function App() {
 
     if (!session?.user) {
       alert("Devi essere connesso per modificare le credenziali.");
-      return;
-    }
-
-    const cleanFullName = newFullName.trim();
-    const cleanPhone = newPhone.trim();
-
-    if (!cleanFullName || !cleanPhone) {
-      alert("Inserisci nome e telefono.");
-      return;
-    }
-
-    if (!isEmailProbablyValid(newEmail.trim() || session.user.email)) {
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
       return;
     }
 
@@ -1662,31 +855,24 @@ function App() {
       payload.password = newPassword.trim();
     }
 
-    setCredentialsLoading(true);
-
-    if (payload.email || payload.password) {
-      const { error } = await supabase.auth.updateUser(payload);
-
-      if (error) {
-        setCredentialsLoading(false);
-        console.error(error);
-        alert("Non è stato possibile aggiornare le credenziali.");
-        return;
-      }
+    if (!payload.email && !payload.password) {
+      alert("Inserisci una nuova email o una nuova password.");
+      return;
     }
 
-    const savedProfile = await saveUserProfile(
-      session.user.id,
-      newEmail.trim() || session.user.email,
-      cleanFullName,
-      cleanPhone
-    );
+    setCredentialsLoading(true);
+
+    const { error } = await supabase.auth.updateUser(payload);
 
     setCredentialsLoading(false);
 
-    if (!savedProfile) return;
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile aggiornare le credenziali.");
+      return;
+    }
 
-    alert("Profilo e credenziali aggiornati correttamente. Se hai cambiato email, potrebbe essere richiesta una conferma.");
+    alert("Credenziali aggiornate correttamente. Se hai cambiato email, potrebbe essere richiesta una conferma.");
     setShowCredentialsModal(false);
     setNewPassword("");
   }
@@ -1733,7 +919,6 @@ function App() {
     setAdminBookings([]);
     setAdminServices([]);
     setAdminImages([]);
-    setAdminOperators([]);
     setAdminTab("agenda");
     setShowJoinShopPopup(false);
     setShowProfileMenu(false);
@@ -1744,14 +929,7 @@ function App() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (bookingSubmitLockRef.current || loading) return;
-
-    bookingSubmitLockRef.current = true;
-    setLoading(true);
-
     if (!session?.user) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
       alert("Per prenotare devi prima accedere o creare un account.");
       setActivePage("account");
       return;
@@ -1760,8 +938,6 @@ function App() {
     const member = await isCurrentShopMember(session.user.id);
 
     if (!member) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
       setShowJoinShopPopup(true);
       return;
     }
@@ -1771,39 +947,22 @@ function App() {
     const profilePhone = profile?.phone?.trim();
 
     if (!profileName || !profilePhone) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Per prenotare mancano nome o telefono nel tuo profilo. Apri il menu in alto a destra, entra in Cambia credenziali e completa nome e telefono.");
-      setActivePage("home");
+      alert("Per prenotare mancano nome o telefono nel tuo profilo. Effettua una nuova registrazione completa o contatta il salone.");
+      setActivePage("account");
       return;
     }
 
-        if (!selectedOperator) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Scegli l’operatore con cui vuoi prenotare.");
-      return;
-    }
-
-    const alreadyBooked = isOperatorBookedAtSlot(bookings, date, time, selectedOperator.id);
+    const alreadyBooked = bookings.some(
+      (booking) => booking.date === date && booking.time === time
+    );
 
     if (alreadyBooked) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Questo operatore non è più disponibile in questo orario. Scegli un altro orario o un altro operatore.");
+      alert("Questo orario non è più disponibile. Scegline un altro.");
       await loadBookings();
       return;
     }
 
-    const blockedByAvailability = isSlotBlockedByAvailability(time, date, availabilityBlocks);
-
-    if (blockedByAvailability) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Questo orario non è disponibile perché il salone risulta chiuso.");
-      await loadAvailabilityBlocks();
-      return;
-    }
+    setLoading(true);
 
     const serviceLabel = selectedService
       ? `${selectedService.name} - €${selectedService.price}`
@@ -1817,22 +976,19 @@ function App() {
         name: profileName,
         phone: profilePhone,
         user_id: session.user.id,
-        operator_id: selectedOperator.id,
-        operator_name: selectedOperator.name,
         shop_id: SHOP_ID,
       },
     ]);
 
+    setLoading(false);
+
     if (error) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
       alert("Non è stato possibile confermare la prenotazione.");
       console.error(error);
       return;
     }
 
     setService("");
-    setOperatorId("");
     setDate("");
     setTime("");
     setOpenCategory("");
@@ -1844,8 +1000,6 @@ function App() {
       await loadAdminBookings();
     }
 
-    bookingSubmitLockRef.current = false;
-    setLoading(false);
     alert("Prenotazione confermata!");
     setActivePage("my-bookings");
   }
@@ -1853,40 +1007,27 @@ function App() {
   async function createManualBooking(e) {
     e.preventDefault();
 
-    if (manualBookingSubmitLockRef.current || manualBookingLoading) return;
-
     const cleanName = manualName.trim();
     const cleanPhone = manualPhone.trim();
     const cleanService = manualService.trim() || "Prenotazione telefonica";
 
-        if (!cleanName || !cleanPhone || !manualDate || !manualTime || !selectedManualOperator) {
-      alert("Inserisci almeno nome, telefono, operatore, giorno e ora.");
+    if (!cleanName || !cleanPhone || !manualDate || !manualTime) {
+      alert("Inserisci almeno nome, telefono, giorno e ora.");
       return;
     }
 
-    manualBookingSubmitLockRef.current = true;
-    setManualBookingLoading(true);
-
-     const alreadyBooked = isOperatorBookedAtSlot(bookings, manualDate, manualTime, selectedManualOperator.id);
+    const alreadyBooked = bookings.some(
+      (booking) => booking.date === manualDate && booking.time === manualTime
+    );
 
     if (alreadyBooked) {
-      manualBookingSubmitLockRef.current = false;
-      setManualBookingLoading(false);
-      alert("Questo operatore risulta già occupato in questo orario. Aggiorna l’agenda o scegli un altro orario.");
+      alert("Questo orario risulta già occupato. Aggiorna l’agenda o scegli un altro orario.");
       await loadBookings();
       await loadAdminBookings();
       return;
     }
 
-    const blockedByAvailability = isSlotBlockedByAvailability(manualTime, manualDate, availabilityBlocks);
-
-    if (blockedByAvailability) {
-      manualBookingSubmitLockRef.current = false;
-      setManualBookingLoading(false);
-      alert("Questo orario risulta bloccato nelle disponibilità del salone.");
-      await loadAvailabilityBlocks();
-      return;
-    }
+    setManualBookingLoading(true);
 
     const { error } = await supabase.from("bookings").insert([
       {
@@ -1895,62 +1036,55 @@ function App() {
         time: manualTime,
         name: cleanName,
         phone: cleanPhone,
-        operator_id: selectedManualOperator.id,
-        operator_name: selectedManualOperator.name,
         user_id: null,
-        created_by: session.user.id,
+created_by: session.user.id,
         shop_id: SHOP_ID,
       },
     ]);
 
+    setManualBookingLoading(false);
+
     if (error) {
-      manualBookingSubmitLockRef.current = false;
-      setManualBookingLoading(false);
       console.error(error);
       alert("Non è stato possibile aggiungere la prenotazione manuale.");
       return;
     }
 
     const optimisticBooking = {
-      id: `manual-${Date.now()}`,
-      service: cleanService,
-      date: manualDate,
-      time: manualTime,
-      name: cleanName,
-      phone: cleanPhone,
-      operator_id: selectedManualOperator.id,
-      operator_name: selectedManualOperator.name,
-      user_id: null,
-      created_by: session.user.id,
-      shop_id: SHOP_ID,
-    };
+  id: `manual-${Date.now()}`,
+  service: cleanService,
+  date: manualDate,
+  time: manualTime,
+  name: cleanName,
+  phone: cleanPhone,
+  user_id: null,
+  created_by: session.user.id,
+  shop_id: SHOP_ID,
+};
 
-    setBookings((current) => [...current, optimisticBooking]);
+setBookings((current) => [...current, optimisticBooking]);
 
-    setAdminBookings((current) =>
-      [...current, optimisticBooking].sort((a, b) => {
-        if (a.date !== b.date) {
-          return a.date.localeCompare(b.date);
-        }
+setAdminBookings((current) =>
+  [...current, optimisticBooking].sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date.localeCompare(b.date);
+    }
 
-        return a.time.localeCompare(b.time);
-      })
-    );
+    return a.time.localeCompare(b.time);
+  })
+);
 
-    setManualName("");
-    setManualPhone("");
-    setManualService("");
-    setManualOperatorId("");
-    setManualDate("");
-    setManualTime("");
-    setShowManualBookingForm(false);
+setManualName("");
+setManualPhone("");
+setManualService("");
+setManualDate("");
+setManualTime("");
+setShowManualBookingForm(false);
 
-    await loadBookings();
-    await loadAdminBookings();
+await loadBookings();
+await loadAdminBookings();
 
-    manualBookingSubmitLockRef.current = false;
-    setManualBookingLoading(false);
-    alert("Prenotazione aggiunta in agenda.");
+alert("Prenotazione aggiunta in agenda.");
   }
 
   async function deleteBooking(id) {
@@ -2025,32 +1159,16 @@ function App() {
 
               <div className="profile-wrapper">
                 <button
-                className="avatar profile-button"
-                type="button"
-                onClick={() => setShowProfileMenu((current) => !current)}
-                aria-label="Apri profilo"
+                  className="avatar profile-button"
+                  type="button"
+                  onClick={() => setShowProfileMenu((current) => !current)}
+                  aria-label="Apri profilo"
                 >
-                {session?.user ? (
-                avatarLabel
-                ) : (
-                <UserRound size={22} strokeWidth={2.4} />
-                )}
+                  {session?.user?.email?.charAt(0)?.toUpperCase() || "B"}
                 </button>
 
                 {showProfileMenu && (
                   <div className="profile-menu">
-                    {!session?.user && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivePage("account");
-                          setShowProfileMenu(false);
-                        }}
-                      >
-                        Accedi o registrati
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={() => {
@@ -2061,32 +1179,28 @@ function App() {
                       Privacy
                     </button>
 
-                    {session?.user && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={openCredentialsModal}
-                        >
-                          Cambia credenziali
-                        </button>
+                    <button
+                      type="button"
+                      onClick={openCredentialsModal}
+                    >
+                      Cambia credenziali
+                    </button>
 
-                        <button
-                          type="button"
-                          onClick={logout}
-                        >
-                          Logout
-                        </button>
+                    <button
+                      type="button"
+                      onClick={logout}
+                    >
+                      Logout
+                    </button>
 
-                        <button
-                          className="danger-item"
-                          type="button"
-                          disabled={deleteAccountLoading}
-                          onClick={deleteAccount}
-                        >
-                          {deleteAccountLoading ? "Eliminazione..." : "Cancella account"}
-                        </button>
-                      </>
-                    )}
+                    <button
+                      className="danger-item"
+                      type="button"
+                      disabled={deleteAccountLoading}
+                      onClick={deleteAccount}
+                    >
+                      {deleteAccountLoading ? "Eliminazione..." : "Cancella account"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -2217,70 +1331,53 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <div className="folder-grid service-folder-grid">
+                  <div className="folder-grid">
                     {serviceCategories.map((group) => (
-                      <Fragment key={group.category}>
-                        <button
-                          type="button"
-                          className={openCategory === group.category ? "folder-card active" : "folder-card"}
-                          onClick={() => toggleCategory(group.category)}
-                        >
-                          <div className="folder-icon">{group.icon}</div>
-                          <strong>{group.category}</strong>
-                          <p>{group.services.length} servizi</p>
-                        </button>
-
-                        <div
-                          className={openCategory === group.category ? "category-panel open" : "category-panel"}
-                        >
-                          <div className="category-heading">
-                            <h2>{group.category}</h2>
-                            <p>{group.description}</p>
-                          </div>
-
-                          <div className="service-options">
-                            {group.services.map((item) => (
-                              <button
-                                type="button"
-                                key={item.id}
-                                className={service === item.name ? "service-option selected" : "service-option"}
-                                onClick={() => setService(item.name)}
-                              >
-                                <div className="service-main-row">
-                                  <strong>{item.name}</strong>
-                                  <span>€{item.price}</span>
-                                </div>
-                                <p>{item.description}</p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </Fragment>
+                      <button
+                        type="button"
+                        key={group.category}
+                        className={openCategory === group.category ? "folder-card active" : "folder-card"}
+                        onClick={() => toggleCategory(group.category)}
+                      >
+                        <div className="folder-icon">{group.icon}</div>
+                        <strong>{group.category}</strong>
+                        <p>{group.services.length} servizi</p>
+                      </button>
                     ))}
                   </div>
+
+                  {serviceCategories.map((group) => (
+                    <div
+                      key={group.category}
+                      className={openCategory === group.category ? "category-panel open" : "category-panel"}
+                    >
+                      <div className="category-heading">
+                        <h2>{group.category}</h2>
+                        <p>{group.description}</p>
+                      </div>
+
+                      <div className="service-options">
+                        {group.services.map((item) => (
+                          <button
+                            type="button"
+                            key={item.id}
+                            className={service === item.name ? "service-option selected" : "service-option"}
+                            onClick={() => setService(item.name)}
+                          >
+                            <div className="service-main-row">
+                              <strong>{item.name}</strong>
+                              <span>€{item.price}</span>
+                            </div>
+                            <p>{item.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </>
               )}
 
-             <label>Operatore</label>
-              <select
-                value={operatorId}
-                onChange={(e) => {
-                  setOperatorId(e.target.value);
-                  setTime("");
-                }}
-                required
-                disabled={loading || activeOperators.length === 0}
-              >
-                <option value="">
-                  {activeOperators.length > 0 ? "Scegli un operatore" : "Nessun operatore disponibile"}
-                </option>
-                {activeOperators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>
-                    {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                  </option>
-                ))}
-              </select>
-             <label>Giorno</label>
+              <label>Giorno</label>
               <input
                 type="date"
                 value={date}
@@ -2291,45 +1388,26 @@ function App() {
                 required
               />
 
-              {bookingAvailabilityNotice && (
-                <div className={`availability-notice ${bookingAvailabilityNotice.type}`}>
-                  <div className="availability-notice-icon">
-                    {bookingAvailabilityNotice.type === "closed" ? "!" : "i"}
-                  </div>
-                  <div>
-                    <strong>{bookingAvailabilityNotice.title}</strong>
-                    <p>{bookingAvailabilityNotice.text}</p>
-                  </div>
-                </div>
-              )}
-
               <label>Ora</label>
-                            <select value={time} onChange={(e) => setTime(e.target.value)} required disabled={!date || !operatorId || loading}>
-                <option value="">
-                  {!operatorId
-                    ? "Prima scegli l’operatore"
-                    : date
-                    ? "Scegli un orario"
-                    : "Prima scegli il giorno"}
-                </option>
+              <select value={time} onChange={(e) => setTime(e.target.value)} required disabled={!date}>
+                <option value="">{date ? "Scegli un orario" : "Prima scegli il giorno"}</option>
                 {availableSlots.map((slot) => (
                   <option key={slot} value={slot}>{slot}</option>
                 ))}
               </select>
 
-                {(selectedService || selectedOperator || date || time) && (
+              {(selectedService || date || time) && (
                 <div className="booking-summary">
                   <span>Riepilogo appuntamento</span>
                   <div className="summary-row"><p>Servizio</p><strong>{selectedService ? selectedService.name : "Da scegliere"}</strong></div>
-                  <div className="summary-row"><p>Operatore</p><strong>{selectedOperator ? selectedOperator.name : "Da scegliere"}</strong></div>
                   <div className="summary-row"><p>Prezzo</p><strong>{selectedService ? `€${selectedService.price}` : "-"}</strong></div>
                   <div className="summary-row"><p>Data</p><strong>{date ? formatLongDate(date) : "-"}</strong></div>
                   <div className="summary-row"><p>Ora</p><strong>{time || "-"}</strong></div>
                 </div>
               )}
 
-              <button className="primary-cta" type="submit" disabled={loading || !service || !operatorId || servicesLoading || activeOperators.length === 0}>
-                {loading ? "Attendi..." : "Conferma prenotazione"}
+              <button className="primary-cta" type="submit" disabled={loading || !service || servicesLoading}>
+                {loading ? "Conferma in corso..." : "Conferma prenotazione"}
               </button>
             </form>
           </section>
@@ -2383,7 +1461,6 @@ function App() {
                         <span>Appuntamento</span>
                         <h3>{booking.service}</h3>
                         <p>{booking.name}</p>
-                      {booking.operator_name && <p>Operatore: {booking.operator_name}</p>}
                       </div>
 
                       <button className="soft-cancel-btn" onClick={() => deleteBooking(booking.id)}>
@@ -2432,9 +1509,8 @@ function App() {
                     type="button"
                     className={authMode === "login" ? "folder-card active" : "folder-card"}
                     onClick={() => setAuthMode("login")}
-                    disabled={authLoading}
                   >
-                    <LogIn size={26} strokeWidth={2.2} />
+                    <div className="folder-icon">↪</div>
                     <strong>Accedi</strong>
                     <p>Hai già un account</p>
                   </button>
@@ -2443,9 +1519,8 @@ function App() {
                     type="button"
                     className={authMode === "register" ? "folder-card active" : "folder-card"}
                     onClick={() => setAuthMode("register")}
-                    disabled={authLoading}
                   >
-                    <UserPlus size={26} strokeWidth={2.2} />
+                    <div className="folder-icon">＋</div>
                     <strong>Registrati</strong>
                     <p>Nuovo cliente</p>
                   </button>
@@ -2459,7 +1534,6 @@ function App() {
                       placeholder="Es. Marco Rossi"
                       value={authFullName}
                       onChange={(e) => setAuthFullName(e.target.value)}
-                      disabled={authLoading}
                       required
                     />
 
@@ -2469,7 +1543,6 @@ function App() {
                       placeholder="Es. 3331234567"
                       value={authPhone}
                       onChange={(e) => setAuthPhone(e.target.value)}
-                      disabled={authLoading}
                       required
                     />
                   </>
@@ -2481,7 +1554,6 @@ function App() {
                   placeholder="nome@email.com"
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  disabled={authLoading}
                   required
                 />
 
@@ -2491,7 +1563,6 @@ function App() {
                   placeholder="Minimo 6 caratteri"
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  disabled={authLoading}
                   required
                 />
                 {authMode === "login" && (
@@ -2530,16 +1601,8 @@ function App() {
 
             <div className="admin-intro-card admin-agenda-intro">
               <span>Pannello operativo</span>
-              <strong>
-                {adminTab === "agenda" && "Agenda appuntamenti"}
-                {adminTab === "content" && "Gestione salone"}
-                {adminTab === "availability" && "Disponibilità salone"}
-              </strong>
-              <p>
-                {adminTab === "agenda" && "La vista principale del barbiere: controlla la giornata, chiama i clienti e gestisci le prenotazioni."}
-                {adminTab === "content" && "Modifica servizi, prezzi, descrizioni e immagini della Home."}
-                {adminTab === "availability" && "Chiudi giorni interi, blocca fasce orarie o apri eccezionalmente giornate normalmente chiuse."}
-              </p>
+              <strong>Agenda appuntamenti</strong>
+              <p>La vista principale del barbiere: controlla la giornata, chiama i clienti e gestisci le prenotazioni.</p>
             </div>
 
             <div className="folder-grid admin-main-tabs">
@@ -2551,7 +1614,7 @@ function App() {
                   loadAdminBookings();
                 }}
               >
-                <CalendarDays size={28} strokeWidth={2.2} />
+                <div className="folder-icon">📅</div>
                 <strong>Agenda</strong>
                 <p>Prenotazioni</p>
               </button>
@@ -2561,22 +1624,9 @@ function App() {
                 className={adminTab === "content" ? "folder-card active" : "folder-card"}
                 onClick={() => setAdminTab("content")}
               >
-                <Scissors size={28} strokeWidth={2.2} />
+                <div className="folder-icon">✂️</div>
                 <strong>Gestione</strong>
                 <p>Servizi e foto</p>
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "availability" ? "folder-card active" : "folder-card"}
-                onClick={() => {
-                  setAdminTab("availability");
-                  loadAvailabilityBlocks();
-                }}
-              >
-                <Ban size={28} strokeWidth={2.2} />
-                <strong>Disponibilità</strong>
-                <p>Chiusure e aperture</p>
               </button>
             </div>
 
@@ -2587,282 +1637,14 @@ function App() {
               </div>
             )}
 
-            {!adminLoading && adminTab === "availability" && (
-              <div className="admin-panel availability-panel">
-                <div className="section-title">
-                  <h3>Disponibilità</h3>
-                  <span>{closureBlocks.length} chiusure · {exceptionalOpeningBlocks.length} aperture</span>
-                </div>
-
-                <div className="admin-help-card">
-                  <strong>Chiusure e aperture eccezionali</strong>
-                  <p>Le chiusure bloccano giorni o fasce orarie. Le aperture eccezionali riaprono una data specifica anche se esiste una chiusura ricorrente, per esempio un lunedì normalmente chiuso.</p>
-                </div>
-
-                <div className="admin-segmented">
-                  <button type="button" className={availabilityTab === "closures" ? "active" : ""} onClick={() => setAvailabilityTab("closures")}>
-                    Chiusure
-                  </button>
-                  <button type="button" className={availabilityTab === "openings" ? "active" : ""} onClick={() => setAvailabilityTab("openings")}>
-                    Aperture eccezionali
-                  </button>
-                </div>
-
-                {availabilityTab === "closures" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createAvailabilityBlock}>
-                      <div className="manual-booking-title">
-                        <span>Chiusura salone</span>
-                        <strong>Blocca disponibilità</strong>
-                        <p>Usa questa sezione per chiudere un giorno intero, una fascia oraria o una ricorrenza settimanale.</p>
-                      </div>
-
-                      <label>Tipo di blocco</label>
-                      <select value={availabilityMode} onChange={(e) => setAvailabilityMode(e.target.value)} disabled={availabilitySaving}>
-                        <option value="date_full_day">Giorno specifico - giornata intera</option>
-                        <option value="date_range">Giorno specifico - fascia oraria</option>
-                        <option value="recurring_full_day">Ricorrenza settimanale - giornata intera</option>
-                        <option value="recurring_range">Ricorrenza settimanale - fascia oraria</option>
-                      </select>
-
-                      {availabilityMode.startsWith("date") && (
-                        <>
-                          <label>Giorno</label>
-                          <input
-                            type="date"
-                            value={availabilityDate}
-                            onChange={(e) => setAvailabilityDate(e.target.value)}
-                            disabled={availabilitySaving}
-                            required
-                          />
-                        </>
-                      )}
-
-                      {availabilityMode.startsWith("recurring") && (
-                        <>
-                          <label>Giorno della settimana</label>
-                          <select value={availabilityWeekday} onChange={(e) => setAvailabilityWeekday(e.target.value)} disabled={availabilitySaving}>
-                            {weekdays.map((day) => (
-                              <option key={day.value} value={day.value}>
-                                {day.label}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      )}
-
-                      {availabilityMode.endsWith("range") && (
-                        <div className="admin-form-grid">
-                          <div>
-                            <label>Dalle</label>
-                            <select value={availabilityStartTime} onChange={(e) => setAvailabilityStartTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Inizio</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label>Alle</label>
-                            <select value={availabilityEndTime} onChange={(e) => setAvailabilityEndTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Fine</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      <label>Motivo visibile solo al barbiere</label>
-                      <input
-                        type="text"
-                        placeholder="Es. ferie, pausa, evento, chiusura straordinaria..."
-                        value={availabilityReason}
-                        onChange={(e) => setAvailabilityReason(e.target.value)}
-                        disabled={availabilitySaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={availabilitySaving}>
-                        {availabilitySaving ? "Attendi..." : "Salva chiusura"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Chiusure attive</h3>
-                      <span>{sortedAvailabilityBlocks.length}</span>
-                    </div>
-
-                    {sortedAvailabilityBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna chiusura attiva</strong>
-                        <p>Quando bloccherai giorni o orari, li vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedAvailabilityBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>{block.recurring ? "Ogni" : "Tipo"}</span>
-                                <strong>{block.recurring ? "↻" : "1x"}</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>{block.recurring ? "Ricorrenza" : "Data"}</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Blocco</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Nessun motivo inserito"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi chiusura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {availabilityTab === "openings" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createExceptionalOpening}>
-                      <div className="manual-booking-title">
-                        <span>Apertura eccezionale</span>
-                        <strong>Apri una data normalmente chiusa</strong>
-                        <p>Perfetto per aprire un lunedì, una domenica o una giornata che risulta chiusa da una ricorrenza. In quella data saranno prenotabili solo gli orari indicati qui.</p>
-                      </div>
-
-                      <label>Giorno da aprire</label>
-                      <input
-                        type="date"
-                        value={openingDate}
-                        onChange={(e) => setOpeningDate(e.target.value)}
-                        disabled={openingSaving}
-                        required
-                      />
-
-                      {openingDate && hasExceptionalOpeningForDate(openingDate, availabilityBlocks) && (
-                        <div className="availability-notice limited">
-                          <div className="availability-notice-icon">i</div>
-                          <div>
-                            <strong>Esiste già almeno un’apertura eccezionale per questa data.</strong>
-                            <p>Puoi aggiungere un’altra fascia oraria, per esempio mattina e pomeriggio separati.</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="admin-form-grid">
-                        <div>
-                          <label>Dalle</label>
-                          <select value={openingStartTime} onChange={(e) => setOpeningStartTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Apertura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label>Alle</label>
-                          <select value={openingEndTime} onChange={(e) => setOpeningEndTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Chiusura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <label>Nota interna</label>
-                      <input
-                        type="text"
-                        placeholder="Es. apertura speciale, recupero appuntamenti, evento..."
-                        value={openingReason}
-                        onChange={(e) => setOpeningReason(e.target.value)}
-                        disabled={openingSaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={openingSaving}>
-                        {openingSaving ? "Attendi..." : "Salva apertura eccezionale"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Aperture eccezionali</h3>
-                      <span>{sortedExceptionalOpeningBlocks.length}</span>
-                    </div>
-
-                    {sortedExceptionalOpeningBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna apertura eccezionale</strong>
-                        <p>Quando aprirai una data normalmente chiusa, la vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedExceptionalOpeningBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>Open</span>
-                                <strong>✓</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>Apertura extra</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Fascia prenotabile</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Apertura eccezionale"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi apertura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
             {!adminLoading && adminTab === "content" && (
               <div className="admin-panel">
-                                <div className="admin-segmented">
+                <div className="admin-segmented">
                   <button type="button" className={adminContentTab === "services" ? "active" : ""} onClick={() => setAdminContentTab("services")}>
                     Servizi e prezzi
                   </button>
                   <button type="button" className={adminContentTab === "photos" ? "active" : ""} onClick={() => setAdminContentTab("photos")}>
                     Foto Home
-                  </button>
-                  <button type="button" className={adminContentTab === "operators" ? "active" : ""} onClick={() => {
-                    setAdminContentTab("operators");
-                    loadAdminOperators();
-                  }}>
-                    Operatori
                   </button>
                 </div>
 
@@ -3045,110 +1827,6 @@ function App() {
                     </div>
                   </>
                 )}
-                              {adminContentTab === "operators" && (
-                  <>
-                    <div className="section-title">
-                      <h3>Operatori</h3>
-                      <span>{adminOperators.length} operatori</span>
-                    </div>
-
-                    <div className="admin-help-card">
-                      <strong>Operatori del salone</strong>
-                      <p>Gli operatori attivi saranno visibili al cliente in fase di prenotazione. Ogni operatore ha la propria disponibilità sugli slot.</p>
-                    </div>
-
-                    <form className="manual-booking-form" onSubmit={createAdminOperator}>
-                      <div className="manual-booking-title">
-                        <span>Nuovo operatore</span>
-                        <strong>Aggiungi barbiere o collaboratore</strong>
-                        <p>Inserisci il nome che il cliente vedrà durante la prenotazione.</p>
-                      </div>
-
-                      <label>Nome operatore</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Marco"
-                        value={newOperatorName}
-                        onChange={(e) => setNewOperatorName(e.target.value)}
-                        disabled={operatorCreating}
-                        required
-                      />
-
-                      <label>Ruolo / specializzazione</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Barber, Hair stylist, Barba e rasatura..."
-                        value={newOperatorRole}
-                        onChange={(e) => setNewOperatorRole(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <label>Ordine</label>
-                      <input
-                        type="number"
-                        value={newOperatorSortOrder}
-                        onChange={(e) => setNewOperatorSortOrder(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={operatorCreating}>
-                        {operatorCreating ? "Creazione..." : "Aggiungi operatore"}
-                      </button>
-                    </form>
-
-                    <div className="admin-service-groups">
-                      {adminOperators.length === 0 ? (
-                        <div className="empty-card compact">
-                          <strong>Nessun operatore configurato</strong>
-                          <p>Aggiungi almeno un operatore per permettere ai clienti di prenotare.</p>
-                        </div>
-                      ) : (
-                        adminOperators.map((item) => (
-                          <article className="admin-edit-card" key={item.id}>
-                            <div className="admin-card-head">
-                              <div className="admin-card-icon">{String(item.name || "O").charAt(0).toUpperCase()}</div>
-                              <div>
-                                <span>{item.active ? "Attivo" : "Non attivo"}</span>
-                                <strong>{item.name || "Operatore senza nome"}</strong>
-                                <p>{item.role || "Nessun ruolo inserito"}</p>
-                              </div>
-                            </div>
-
-                            <div className="admin-form-grid">
-                              <div>
-                                <label>Nome</label>
-                                <input type="text" value={item.name || ""} onChange={(e) => updateAdminOperatorField(item.id, "name", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ruolo</label>
-                                <input type="text" value={item.role || ""} onChange={(e) => updateAdminOperatorField(item.id, "role", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ordine</label>
-                                <input type="number" value={item.sort_order || 0} onChange={(e) => updateAdminOperatorField(item.id, "sort_order", e.target.value)} />
-                              </div>
-                            </div>
-
-                            <label className="admin-toggle-row">
-                              <input type="checkbox" checked={Boolean(item.active)} onChange={(e) => updateAdminOperatorField(item.id, "active", e.target.checked)} />
-                              <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
-                            </label>
-
-                            <button className="primary-cta" type="button" disabled={operatorSavingId === item.id} onClick={() => saveAdminOperator(item)}>
-                              {operatorSavingId === item.id ? "Salvataggio..." : "Salva operatore"}
-                            </button>
-
-                            <button className="admin-delete-booking-btn" type="button" disabled={operatorDeletingId === item.id} onClick={() => deleteAdminOperator(item)}>
-                              {operatorDeletingId === item.id ? "Eliminazione..." : "Elimina operatore"}
-                            </button>
-                          </article>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
@@ -3168,7 +1846,6 @@ function App() {
                   className="primary-cta manual-booking-toggle"
                   type="button"
                   onClick={() => setShowManualBookingForm((current) => !current)}
-                  disabled={manualBookingLoading}
                 >
                   {showManualBookingForm ? "Chiudi inserimento rapido" : "Aggiungi prenotazione a nome di cliente"}
                 </button>
@@ -3187,7 +1864,6 @@ function App() {
                       placeholder="Es. Marco Rossi"
                       value={manualName}
                       onChange={(e) => setManualName(e.target.value)}
-                      disabled={manualBookingLoading}
                       required
                     />
 
@@ -3197,7 +1873,6 @@ function App() {
                       placeholder="Es. 3331234567"
                       value={manualPhone}
                       onChange={(e) => setManualPhone(e.target.value)}
-                      disabled={manualBookingLoading}
                       required
                     />
 
@@ -3208,28 +1883,8 @@ function App() {
                       placeholder="Es. taglio, barba, sistemazione veloce..."
                       value={manualService}
                       onChange={(e) => setManualService(e.target.value)}
-                      disabled={manualBookingLoading}
                     />
-                                          <label>Operatore</label>
-                    <select
-                      value={manualOperatorId}
-                      onChange={(e) => {
-                        setManualOperatorId(e.target.value);
-                        setManualTime("");
-                      }}
-                      disabled={manualBookingLoading || activeOperators.length === 0}
-                      required
-                    >
-                      <option value="">
-                        {activeOperators.length > 0 ? "Scegli operatore" : "Nessun operatore disponibile"}
-                      </option>
-                      {activeOperators.map((operator) => (
-                        <option key={operator.id} value={operator.id}>
-                          {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    
+
                     <div className="admin-form-grid">
                       <div>
                         <label>Giorno</label>
@@ -3240,14 +1895,13 @@ function App() {
                             setManualDate(e.target.value);
                             setManualTime("");
                           }}
-                          disabled={manualBookingLoading}
                           required
                         />
                       </div>
 
                       <div>
                         <label>Ora</label>
-                        <select value={manualTime} onChange={(e) => setManualTime(e.target.value)} required disabled={!manualDate || manualBookingLoading}>
+                        <select value={manualTime} onChange={(e) => setManualTime(e.target.value)} required disabled={!manualDate}>
                           <option value="">{manualDate ? "Scegli" : "Prima giorno"}</option>
                           {manualAvailableSlots.map((slot) => (
                             <option key={slot} value={slot}>{slot}</option>
@@ -3257,7 +1911,7 @@ function App() {
                     </div>
 
                     <button className="primary-cta" type="submit" disabled={manualBookingLoading}>
-                      {manualBookingLoading ? "Attendi..." : "Aggiungi in agenda"}
+                      {manualBookingLoading ? "Salvataggio..." : "Aggiungi in agenda"}
                     </button>
                   </form>
                 )}
@@ -3314,8 +1968,7 @@ function App() {
 
                               <div className="modern-booking-body">
                                 <span>Servizio</span>
-                               <h3>{booking.service || "Prenotazione telefonica"}</h3>
-                                <p>Operatore: {booking.operator_name || "Non assegnato"}</p>
+                                <h3>{booking.service || "Prenotazione telefonica"}</h3>
                                 <a className="phone-link" href={`tel:${booking.phone}`}>
                                   {booking.phone}
                                 </a>
@@ -3359,7 +2012,7 @@ function App() {
 
             <div className="info-mosaic">
               <div className="mosaic-card wide">
-                <MapPin size={24} strokeWidth={2.2} />
+                <span>📍</span>
                 <div>
                   <strong>Via Roma 25</strong>
                   <p>Palermo</p>
@@ -3367,19 +2020,19 @@ function App() {
               </div>
 
               <div className="mosaic-card">
-                <Clock3 size={24} strokeWidth={2.2} />
-                <strong>lun - Sab</strong>
+                <span>🕘</span>
+                <strong>Lun - Sab</strong>
                 <p>09:00 - 18:30</p>
               </div>
 
               <div className="mosaic-card">
-                <Scissors size={24} strokeWidth={2.2} />
+                <span>✂️</span>
                 <strong>4 aree</strong>
                 <p>Taglio, barba, estetica, tecnico</p>
               </div>
 
               <div className="mosaic-card wide dark">
-                <Phone size={24} strokeWidth={2.2} />
+                <span>📞</span>
                 <div>
                   <strong>333 123 4567</strong>
                   <p>Contatto diretto del salone</p>
@@ -3387,7 +2040,14 @@ function App() {
               </div>
             </div>
 
-            
+            <div className="info-service-strip">
+              {serviceCategories.map((group) => (
+                <div key={group.category}>
+                  <span>{group.icon}</span>
+                  <strong>{group.category}</strong>
+                </div>
+              ))}
+            </div>
           </section>
         )}
       </main>
@@ -3434,7 +2094,6 @@ function App() {
             <div className="delete-booking-preview">
               <strong>{adminBookingToDelete.name}</strong>
               <p>{adminBookingToDelete.service || "Prenotazione telefonica"}</p>
-              <p>Operatore: {adminBookingToDelete.operator_name || "Non assegnato"}</p>
               <span>{formatLongDate(adminBookingToDelete.date)} alle {adminBookingToDelete.time}</span>
             </div>
 
@@ -3569,12 +2228,6 @@ function App() {
               </div>
             ) : (
               <form className="credentials-form" onSubmit={updateCredentials}>
-                <label>Nome e cognome</label>
-                <input type="text" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} />
-
-                <label>Telefono</label>
-                <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-
                 <label>Nuova email</label>
                 <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
 
@@ -3591,50 +2244,19 @@ function App() {
       )}
 
       <nav className="bottom-nav four-items">
-  <button
-    className={activePage === "home" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("home");
-    }}
-  >
-    <Home size={18} strokeWidth={2.4} />
-    Home
-  </button>
-
-  <button
-    className={activePage === "book" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("book");
-    }}
-  >
-    <CalendarPlus size={18} strokeWidth={2.4} />
-    Prenota
-  </button>
-
-  <button
-    className={activePage === "my-bookings" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("my-bookings");
-    }}
-  >
-    <CalendarCheck size={18} strokeWidth={2.4} />
-    Prenotazioni
-  </button>
-
-  <button
-    className={activePage === "info" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("info");
-    }}
-  >
-    <Info size={18} strokeWidth={2.4} />
-    Salone
-  </button>
-</nav>
+        <button className={activePage === "home" ? "active" : ""} onClick={() => setActivePage("home")}>
+          <span>⌂</span> Home
+        </button>
+        <button className={activePage === "book" ? "active" : ""} onClick={() => setActivePage("book")}>
+          <span>＋</span> Prenota
+        </button>
+        <button className={activePage === "my-bookings" ? "active" : ""} onClick={() => setActivePage("my-bookings")}>
+          <span>◷</span> Prenotazioni
+        </button>
+        <button className={activePage === "info" ? "active" : ""} onClick={() => setActivePage("info")}>
+          <span>i</span> Salone
+        </button>
+      </nav>
     </div>
   );
 }
