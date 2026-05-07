@@ -5,12 +5,11 @@ import CredentialsModal from "./components/CredentialsModal";
 import PrivacyModal from "./components/PrivacyModal";
 import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
 import JoinShopPopup from "./components/JoinShopPopup";
-import ProfileMenu from "./components/ProfileMenu";
 import BottomNav from "./components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
 
-  UserRound,
+  
   LogIn,
   UserPlus,
   CalendarDays,
@@ -2033,128 +2032,7 @@ async function loadShopSettings() {
   return (
     <div className="app">
       <main className="phone-shell">
-        {activePage === "home" && (
-          <section className="screen">
-            <header className="app-header">
-              <div>
-                <span className="eyebrow">Barber studio</span>
-                <h1>Barber Booking</h1>
-                {isAdmin && <span className="eyebrow">Admin attivo</span>}
-              </div>
-
-              <div className="profile-wrapper">
-                <button
-                className="avatar profile-button"
-                type="button"
-                onClick={() => setShowProfileMenu((current) => !current)}
-                aria-label="Apri profilo"
-                >
-                {session?.user ? (
-                avatarLabel
-                ) : (
-                <UserRound size={22} strokeWidth={2.4} />
-                )}
-                </button>
-
-               {showProfileMenu && (
-  <ProfileMenu
-    session={session}
-    deleteAccountLoading={deleteAccountLoading}
-    setActivePage={setActivePage}
-    setShowProfileMenu={setShowProfileMenu}
-    setShowPrivacyModal={setShowPrivacyModal}
-    openCredentialsModal={openCredentialsModal}
-    logout={logout}
-    deleteAccount={deleteAccount}
-  />
-)}
-              </div>
-            </header>
-
-            <div className="hero-card">
-              <div
-                className="gallery-track"
-                style={{ transform: `translateX(-${galleryIndex * 100}%)` }}
-              >
-                {gallery.map((item, index) => (
-                  <div className="gallery-slide" key={`${item.title}-${index}`}>
-                    <img src={item.image} alt={item.title} />
-                  </div>
-                ))}
-              </div>
-
-              <div className="hero-gradient"></div>
-
-              <div className="hero-content">
-                <span>{gallery[galleryIndex]?.title || "Barber studio"}</span>
-                <h2>Il tuo stile, prenotato in pochi secondi.</h2>
-              </div>
-
-              <div className="gallery-dots">
-                {gallery.map((item, index) => (
-                  <button
-                    key={`${item.title}-${index}`}
-                    className={galleryIndex === index ? "dot active" : "dot"}
-                    onClick={() => goToImage(index)}
-                    aria-label={`Mostra foto ${index + 1}`}
-                  ></button>
-                ))}
-              </div>
-            </div>
-
-            <section className="quick-info">
-              <div>
-                <span>Indirizzo</span>
-                <strong>Via Roma 25, Palermo</strong>
-              </div>
-              <div>
-                <span>Orari</span>
-                <strong>Lun - Sab</strong>
-              </div>
-            </section>
-
-            <button className="primary-cta" onClick={() => setActivePage("book")}>
-              Prenota appuntamento
-            </button>
-
-            {isAdmin && (
-              <button
-                className="primary-cta"
-                style={{ background: "#b88746", marginTop: "10px" }}
-                onClick={() => {
-                  setAdminTab("agenda");
-                  setActivePage("admin");
-                  loadAdminBookings();
-                }}
-              >
-                Area Barbiere
-              </button>
-            )}
-
-            <section className="services-preview">
-              <div className="section-title">
-                <h3>Servizi</h3>
-                <span>Cura completa uomo</span>
-              </div>
-
-              <div className="home-service-grid">
-                {servicesLoading ? (
-                  <div className="home-service-card">
-                    <span>Caricamento servizi</span>
-                    <p>Stiamo recuperando i servizi aggiornati del salone.</p>
-                  </div>
-                ) : (
-                  serviceCategories.map((group) => (
-                    <div className="home-service-card" key={group.category}>
-                      <span>{group.category}</span>
-                      <p>{group.description}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          </section>
-        )}
+        
 
         {activePage === "home" && (
   <HomeScreen
@@ -2180,7 +2058,29 @@ async function loadShopSettings() {
     serviceCategories={serviceCategories}
   />
 )}
-
+{activePage === "book" && (
+  <BookingScreen
+    setActivePage={setActivePage}
+    serviceCategories={serviceCategories}
+    servicesLoading={servicesLoading}
+    service={service}
+    setService={setService}
+    selectedService={selectedService}
+    operatorId={operatorId}
+    setOperatorId={setOperatorId}
+    operators={operators}
+    activeOperators={activeOperators}
+    selectedOperator={selectedOperator}
+    date={date}
+    setDate={setDate}
+    time={time}
+    setTime={setTime}
+    availableSlots={availableSlots}
+    bookingAvailabilityNotice={bookingAvailabilityNotice}
+    loading={loading}
+    handleSubmit={handleSubmit}
+  />
+)}
         {activePage === "my-bookings" && (
           <section className="screen">
             <header className="page-header my-bookings-header">
