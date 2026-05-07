@@ -1,0 +1,73 @@
+import HomeHeader from "./HomeHeader";
+import HeroCarousel from "./HeroCarousel";
+import QuickInfo from "./QuickInfo";
+import HomeCTA from "./HomeCTA";
+import HomeServices from "./HomeServices";
+
+function HomeScreen({
+  shopSettings,
+  shopAddressLine,
+  isAdmin,
+  session,
+  avatarLabel,
+  showProfileMenu,
+  setShowProfileMenu,
+  setShowPrivacyModal,
+  setActivePage,
+  deleteAccountLoading,
+  openCredentialsModal,
+  logout,
+  deleteAccount,
+  gallery,
+  galleryIndex,
+  goToImage,
+  setAdminTab,
+  loadAdminBookings,
+  servicesLoading,
+  serviceCategories,
+}) {
+  return (
+    <section className="screen">
+      <HomeHeader
+        shopSettings={shopSettings}
+        isAdmin={isAdmin}
+        session={session}
+        avatarLabel={avatarLabel}
+        showProfileMenu={showProfileMenu}
+        setShowProfileMenu={setShowProfileMenu}
+        setShowPrivacyModal={setShowPrivacyModal}
+        setActivePage={setActivePage}
+        deleteAccountLoading={deleteAccountLoading}
+        openCredentialsModal={openCredentialsModal}
+        logout={logout}
+        deleteAccount={deleteAccount}
+      />
+
+      <HeroCarousel
+        gallery={gallery}
+        galleryIndex={galleryIndex}
+        goToImage={goToImage}
+        shopSettings={shopSettings}
+      />
+
+      <QuickInfo
+        shopAddressLine={shopAddressLine}
+        shopSettings={shopSettings}
+      />
+
+      <HomeCTA
+        isAdmin={isAdmin}
+        setAdminTab={setAdminTab}
+        setActivePage={setActivePage}
+        loadAdminBookings={loadAdminBookings}
+      />
+
+      <HomeServices
+        servicesLoading={servicesLoading}
+        serviceCategories={serviceCategories}
+      />
+    </section>
+  );
+}
+
+export default HomeScreen;

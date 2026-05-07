@@ -1,3 +1,4 @@
+import HomeScreen from "./screens/HomeScreen";
 import InfoScreen from "./screens/InfoScreen";
 import CredentialsModal from "./components/CredentialsModal";
 import PrivacyModal from "./components/PrivacyModal";
@@ -5,7 +6,7 @@ import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
 import JoinShopPopup from "./components/JoinShopPopup";
 import ProfileMenu from "./components/ProfileMenu";
 import BottomNav from "./components/BottomNav";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 
   UserRound,
@@ -341,6 +342,9 @@ const defaultShopSettings = {
   name: "Barber Booking",
   description: "Tagli, barba e trattamenti uomo in un ambiente curato, moderno e su appuntamento.",
   address: "Via Roma 25",
+  hero_badge: "Barber studio",
+  hero_title: "Il tuo stile, prenotato in pochi secondi.",
+  
   city: "Palermo",
   opening_label: "Lun - Sab",
   opening_hours: "09:00 - 18:30",
@@ -351,7 +355,7 @@ function App() {
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
-  const [openCategory, setOpenCategory] = useState("");
+ 
 
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -452,7 +456,7 @@ function App() {
   const activeOperators = useMemo(() => {
     return operators.filter((operator) => operator.active !== false);
   }, [operators]);
-
+  const shopAddressLine = [shopSettings.address, shopSettings.city].filter(Boolean).join(", ");
   const today = useMemo(() => {
     return getTodayString();
   }, []);
@@ -670,9 +674,7 @@ function App() {
     setGalleryIndex(index);
   }
 
-  function toggleCategory(category) {
-    setOpenCategory((current) => (current === category ? "" : category));
-  }
+  
 
   function openCredentialsModal() {
     setNewEmail(session?.user?.email || "");
@@ -1851,7 +1853,7 @@ async function loadShopSettings() {
     setOperatorId("");
     setDate("");
     setTime("");
-    setOpenCategory("");
+    
 
     await loadBookings();
     await loadMyBookings(session.user.id);
@@ -2153,163 +2155,30 @@ async function loadShopSettings() {
           </section>
         )}
 
-        {activePage === "book" && (
-          <section className="screen">
-            <header className="page-header">
-              <button className="back-btn" onClick={() => setActivePage("home")}>
-                ←
-              </button>
-              <div>
-                <span className="eyebrow">Prenotazione</span>
-                <h1>Scegli il servizio</h1>
-              </div>
-            </header>
-
-            {!session?.user && (
-              <div className="lookup-card">
-                <div>
-                  <span>Accesso richiesto</span>
-                  <strong>Accedi per prenotare e ritrovare i tuoi appuntamenti.</strong>
-                </div>
-                <button className="primary-cta" type="button" onClick={() => setActivePage("account")}>
-                  Accedi o registrati
-                </button>
-              </div>
-            )}
-
-            {session?.user && userProfile?.full_name && userProfile?.phone && (
-              <div className="profile-mini-card">
-                <span>Prenoterai come</span>
-                <strong>{userProfile.full_name}</strong>
-                <p>{userProfile.phone}</p>
-              </div>
-            )}
-
-            <form className="booking-form" onSubmit={handleSubmit}>
-              {servicesLoading ? (
-                <div className="empty-card compact">
-                  <strong>Caricamento servizi</strong>
-                  <p>Attendi qualche secondo.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="folder-grid service-folder-grid">
-                    {serviceCategories.map((group) => (
-                      <Fragment key={group.category}>
-                        <button
-                          type="button"
-                          className={openCategory === group.category ? "folder-card active" : "folder-card"}
-                          onClick={() => toggleCategory(group.category)}
-                        >
-                          <div className="folder-icon">{group.icon}</div>
-                          <strong>{group.category}</strong>
-                          <p>{group.services.length} servizi</p>
-                        </button>
-
-                        <div
-                          className={openCategory === group.category ? "category-panel open" : "category-panel"}
-                        >
-                          <div className="category-heading">
-                            <h2>{group.category}</h2>
-                            <p>{group.description}</p>
-                          </div>
-
-                          <div className="service-options">
-                            {group.services.map((item) => (
-                              <button
-                                type="button"
-                                key={item.id}
-                                className={service === item.name ? "service-option selected" : "service-option"}
-                                onClick={() => setService(item.name)}
-                              >
-                                <div className="service-main-row">
-                                  <strong>{item.name}</strong>
-                                  <span>€{item.price}</span>
-                                </div>
-                                <p>{item.description}</p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </Fragment>
-                    ))}
-                  </div>
-                </>
-              )}
-
-             <label>Operatore</label>
-              <select
-                value={operatorId}
-                onChange={(e) => {
-                  setOperatorId(e.target.value);
-                  setTime("");
-                }}
-                required
-                disabled={loading || activeOperators.length === 0}
-              >
-                <option value="">
-                  {activeOperators.length > 0 ? "Scegli un operatore" : "Nessun operatore disponibile"}
-                </option>
-                {activeOperators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>
-                    {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                  </option>
-                ))}
-              </select>
-             <label>Giorno</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  setTime("");
-                }}
-                required
-              />
-
-              {bookingAvailabilityNotice && (
-                <div className={`availability-notice ${bookingAvailabilityNotice.type}`}>
-                  <div className="availability-notice-icon">
-                    {bookingAvailabilityNotice.type === "closed" ? "!" : "i"}
-                  </div>
-                  <div>
-                    <strong>{bookingAvailabilityNotice.title}</strong>
-                    <p>{bookingAvailabilityNotice.text}</p>
-                  </div>
-                </div>
-              )}
-
-              <label>Ora</label>
-                            <select value={time} onChange={(e) => setTime(e.target.value)} required disabled={!date || !operatorId || loading}>
-                <option value="">
-                  {!operatorId
-                    ? "Prima scegli l’operatore"
-                    : date
-                    ? "Scegli un orario"
-                    : "Prima scegli il giorno"}
-                </option>
-                {availableSlots.map((slot) => (
-                  <option key={slot} value={slot}>{slot}</option>
-                ))}
-              </select>
-
-                {(selectedService || selectedOperator || date || time) && (
-                <div className="booking-summary">
-                  <span>Riepilogo appuntamento</span>
-                  <div className="summary-row"><p>Servizio</p><strong>{selectedService ? selectedService.name : "Da scegliere"}</strong></div>
-                  <div className="summary-row"><p>Operatore</p><strong>{selectedOperator ? selectedOperator.name : "Da scegliere"}</strong></div>
-                  <div className="summary-row"><p>Prezzo</p><strong>{selectedService ? `€${selectedService.price}` : "-"}</strong></div>
-                  <div className="summary-row"><p>Data</p><strong>{date ? formatLongDate(date) : "-"}</strong></div>
-                  <div className="summary-row"><p>Ora</p><strong>{time || "-"}</strong></div>
-                </div>
-              )}
-
-              <button className="primary-cta" type="submit" disabled={loading || !service || !operatorId || servicesLoading || activeOperators.length === 0}>
-                {loading ? "Attendi..." : "Conferma prenotazione"}
-              </button>
-            </form>
-          </section>
-        )}
+        {activePage === "home" && (
+  <HomeScreen
+    shopSettings={shopSettings}
+    shopAddressLine={shopAddressLine}
+    isAdmin={isAdmin}
+    session={session}
+    avatarLabel={avatarLabel}
+    showProfileMenu={showProfileMenu}
+    setShowProfileMenu={setShowProfileMenu}
+    setShowPrivacyModal={setShowPrivacyModal}
+    setActivePage={setActivePage}
+    deleteAccountLoading={deleteAccountLoading}
+    openCredentialsModal={openCredentialsModal}
+    logout={logout}
+    deleteAccount={deleteAccount}
+    gallery={gallery}
+    galleryIndex={galleryIndex}
+    goToImage={goToImage}
+    setAdminTab={setAdminTab}
+    loadAdminBookings={loadAdminBookings}
+    servicesLoading={servicesLoading}
+    serviceCategories={serviceCategories}
+  />
+)}
 
         {activePage === "my-bookings" && (
           <section className="screen">
