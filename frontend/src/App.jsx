@@ -1,3 +1,4 @@
+import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
 import JoinShopPopup from "./components/JoinShopPopup";
 import ProfileMenu from "./components/ProfileMenu";
 import BottomNav from "./components/BottomNav";
@@ -3359,43 +3360,13 @@ function App() {
     cancelJoinShop={cancelJoinShop}
   />
 )}
-      {adminBookingToDelete && (
-        <div className="modal-overlay" onClick={() => setAdminBookingToDelete(null)}>
-          <div className="modal-card confirm-delete-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <div>
-                <span className="popup-eyebrow">Conferma eliminazione</span>
-                <h2>Vuoi eliminare questa prenotazione?</h2>
-              </div>
-
-              <button className="close-modal" type="button" onClick={() => setAdminBookingToDelete(null)}>
-                ×
-              </button>
-            </div>
-
-            <div className="delete-booking-preview">
-              <strong>{adminBookingToDelete.name}</strong>
-              <p>{adminBookingToDelete.service || "Prenotazione telefonica"}</p>
-              <p>Operatore: {adminBookingToDelete.operator_name || "Non assegnato"}</p>
-              <span>{formatLongDate(adminBookingToDelete.date)} alle {adminBookingToDelete.time}</span>
-            </div>
-
-            <p className="delete-warning-text">
-              Questa operazione non può essere annullata. La prenotazione verrà rimossa dall’agenda e l’orario tornerà disponibile.
-            </p>
-
-            <div className="confirm-delete-actions">
-              <button className="secondary-cta" type="button" disabled={adminDeleteLoading} onClick={() => setAdminBookingToDelete(null)}>
-                Annulla
-              </button>
-
-              <button className="danger-cta" type="button" disabled={adminDeleteLoading} onClick={confirmDeleteAdminBooking}>
-                {adminDeleteLoading ? "Eliminazione..." : "Elimina prenotazione"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteBookingModal
+  adminBookingToDelete={adminBookingToDelete}
+  adminDeleteLoading={adminDeleteLoading}
+  setAdminBookingToDelete={setAdminBookingToDelete}
+  confirmDeleteAdminBooking={confirmDeleteAdminBooking}
+  formatLongDate={formatLongDate}
+/>
 
       {showPrivacyModal && (
         <div className="modal-overlay" onClick={() => setShowPrivacyModal(false)}>
