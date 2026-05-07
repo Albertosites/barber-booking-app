@@ -1,3 +1,4 @@
+import BookingScreen from "./screens/BookingScreen";
 import HomeScreen from "./screens/HomeScreen";
 import InfoScreen from "./screens/InfoScreen";
 import CredentialsModal from "./components/CredentialsModal";
