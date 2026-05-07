@@ -1,9 +1,7 @@
+import BottomNav from "./components/BottomNav";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Home,
-  CalendarPlus,
-  CalendarCheck,
-  Info,
+
   UserRound,
   LogIn,
   UserPlus,
@@ -3590,51 +3588,11 @@ function App() {
         </div>
       )}
 
-      <nav className="bottom-nav four-items">
-  <button
-    className={activePage === "home" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("home");
-    }}
-  >
-    <Home size={18} strokeWidth={2.4} />
-    Home
-  </button>
-
-  <button
-    className={activePage === "book" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("book");
-    }}
-  >
-    <CalendarPlus size={18} strokeWidth={2.4} />
-    Prenota
-  </button>
-
-  <button
-    className={activePage === "my-bookings" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("my-bookings");
-    }}
-  >
-    <CalendarCheck size={18} strokeWidth={2.4} />
-    Prenotazioni
-  </button>
-
-  <button
-    className={activePage === "info" ? "active" : ""}
-    onClick={() => {
-      setShowProfileMenu(false);
-      setActivePage("info");
-    }}
-  >
-    <Info size={18} strokeWidth={2.4} />
-    Salone
-  </button>
-</nav>
+      <BottomNav
+  activePage={activePage}
+  setActivePage={setActivePage}
+  setShowProfileMenu={setShowProfileMenu}
+/>
     </div>
   );
 }
