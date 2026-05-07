@@ -1,3 +1,4 @@
+import ProfileMenu from "./components/ProfileMenu";
 import BottomNav from "./components/BottomNav";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -2035,58 +2036,18 @@ function App() {
                 )}
                 </button>
 
-                {showProfileMenu && (
-                  <div className="profile-menu">
-                    {!session?.user && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivePage("account");
-                          setShowProfileMenu(false);
-                        }}
-                      >
-                        Accedi o registrati
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowPrivacyModal(true);
-                        setShowProfileMenu(false);
-                      }}
-                    >
-                      Privacy
-                    </button>
-
-                    {session?.user && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={openCredentialsModal}
-                        >
-                          Cambia credenziali
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={logout}
-                        >
-                          Logout
-                        </button>
-
-                        <button
-                          className="danger-item"
-                          type="button"
-                          disabled={deleteAccountLoading}
-                          onClick={deleteAccount}
-                        >
-                          {deleteAccountLoading ? "Eliminazione..." : "Cancella account"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+               {showProfileMenu && (
+  <ProfileMenu
+    session={session}
+    deleteAccountLoading={deleteAccountLoading}
+    setActivePage={setActivePage}
+    setShowProfileMenu={setShowProfileMenu}
+    setShowPrivacyModal={setShowPrivacyModal}
+    openCredentialsModal={openCredentialsModal}
+    logout={logout}
+    deleteAccount={deleteAccount}
+  />
+)}
               </div>
             </header>
 
