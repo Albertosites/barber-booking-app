@@ -1,3 +1,4 @@
+import InfoScreen from "./screens/InfoScreen";
 import CredentialsModal from "./components/CredentialsModal";
 import PrivacyModal from "./components/PrivacyModal";
 import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
@@ -13,9 +14,7 @@ import {
   CalendarDays,
   Scissors,
   Ban,
-  MapPin,
-  Clock3,
-  Phone,
+  
 } from "lucide-react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
@@ -336,8 +335,19 @@ function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableS
 
   return null;
 }
-
+const defaultShopSettings = {
+  logo_letter: "B",
+  eyebrow: "Barber studio",
+  name: "Barber Booking",
+  description: "Tagli, barba e trattamenti uomo in un ambiente curato, moderno e su appuntamento.",
+  address: "Via Roma 25",
+  city: "Palermo",
+  opening_label: "Lun - Sab",
+  opening_hours: "09:00 - 18:30",
+  phone: "333 123 4567",
+};
 function App() {
+  const [shopSettings, setShopSettings] = useState(defaultShopSettings);
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
@@ -598,6 +608,7 @@ function App() {
   }, []);
 
     useEffect(() => {
+    loadShopSettings();
     loadServices();
     loadHomeImages();
     loadBookings();
@@ -671,7 +682,9 @@ function App() {
     setShowCredentialsModal(true);
     setShowProfileMenu(false);
   }
-
+async function loadShopSettings() {
+  setShopSettings(defaultShopSettings);
+}
   function closeAllModals() {
     setShowPrivacyModal(false);
     setShowCredentialsModal(false);
@@ -3300,59 +3313,11 @@ function App() {
         )}
 
         {activePage === "info" && (
-          <section className="screen">
-            <header className="page-header">
-              <button className="back-btn" onClick={() => setActivePage("home")}>
-                ←
-              </button>
-              <div>
-                <span className="eyebrow">Salone</span>
-                <h1>Informazioni</h1>
-              </div>
-            </header>
-
-            <div className="salon-hero-card">
-              <div className="salon-mark">B</div>
-              <div>
-                <span>Barber studio</span>
-                <h2>Barber Booking</h2>
-                <p>Tagli, barba e trattamenti uomo in un ambiente curato, moderno e su appuntamento.</p>
-              </div>
-            </div>
-
-            <div className="info-mosaic">
-              <div className="mosaic-card wide">
-                <MapPin size={24} strokeWidth={2.2} />
-                <div>
-                  <strong>Via Roma 25</strong>
-                  <p>Palermo</p>
-                </div>
-              </div>
-
-              <div className="mosaic-card">
-                <Clock3 size={24} strokeWidth={2.2} />
-                <strong>lun - Sab</strong>
-                <p>09:00 - 18:30</p>
-              </div>
-
-              <div className="mosaic-card">
-                <Scissors size={24} strokeWidth={2.2} />
-                <strong>4 aree</strong>
-                <p>Taglio, barba, estetica, tecnico</p>
-              </div>
-
-              <div className="mosaic-card wide dark">
-                <Phone size={24} strokeWidth={2.2} />
-                <div>
-                  <strong>333 123 4567</strong>
-                  <p>Contatto diretto del salone</p>
-                </div>
-              </div>
-            </div>
-
-            
-          </section>
-        )}
+  <InfoScreen
+    setActivePage={setActivePage}
+    shopSettings={shopSettings}
+  />
+)}
       </main>
 
       {showJoinShopPopup && (
