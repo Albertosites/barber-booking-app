@@ -1842,3 +1842,221 @@ select:focus {
   display: block;
   margin: 0 auto 4px;
 }
+.booking-service-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.booking-service-group {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.booking-service-group.open {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 34px rgba(74, 57, 35, 0.1);
+}
+
+.booking-service-group-title {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 44px 1fr 28px;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  color: var(--text);
+}
+
+.booking-service-group-title > span {
+  width: 44px;
+  height: 44px;
+  border-radius: 17px;
+  background: var(--accent-soft);
+  display: grid;
+  place-items: center;
+  font-size: 21px;
+}
+
+.booking-service-group-title strong {
+  display: block;
+  font-size: 16px;
+}
+
+.booking-service-group-title p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.booking-service-group-title b {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.booking-service-group .service-options {
+  padding: 0 14px 14px;
+}
+
+.service-option.active {
+  background: #111;
+  color: white;
+  border-color: #111;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
+}
+
+.service-option.active p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.service-option.active span {
+  color: #f3d5a7;
+}
+.operator-section-title {
+  margin-top: 6px;
+}
+
+.operator-choice-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+
+.operator-choice {
+  min-width: 104px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface-soft);
+  padding: 14px 12px;
+  color: var(--text);
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  text-align: center;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.operator-choice:hover {
+  transform: translateY(-1px);
+  border-color: rgba(17, 17, 17, 0.28);
+}
+
+.operator-choice.active {
+  background: #111;
+  color: white;
+  border-color: #111;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
+}
+
+.operator-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-size: 23px;
+  font-weight: 900;
+}
+
+.operator-choice.active .operator-avatar {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
+.operator-choice strong {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.operator-choice p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operator-choice.active p {
+  color: rgba(255, 255, 255, 0.66);
+}
+.admin-category-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 2fr 30px;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  color: var(--text);
+}
+
+.admin-category-toggle p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-category-toggle b {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+
+.admin-ghost-card {
+  width: 100%;
+  border: 1px dashed rgba(184, 135, 70, 0.55);
+  border-radius: 24px;
+  background: rgba(184, 135, 70, 0.08);
+  color: var(--warm);
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  font-weight: 900;
+}
+
+.admin-ghost-card span {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--warm);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.admin-ghost-category {
+  margin-top: 2px;
+}
+.admin-service-edit-toggle {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 900;
+}

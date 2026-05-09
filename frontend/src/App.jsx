@@ -1,22 +1,18 @@
-import BookingScreen from "./screens/BookingScreen";
-import HomeScreen from "./screens/HomeScreen";
-import InfoScreen from "./screens/InfoScreen";
+import AdminContent from "./screen/AdminScreen/AdminContent";
+import AdminAvailability from "./screen/AdminScreen/AdminAvailability";
+import AdminAgenda from "./screen/AdminScreen/AdminAgenda";
+import AdminScreen from "./screen/AdminScreen/index";
+import AccountScreen from "./screen/AccountScreen/index";
+import MyBookingsScreen from "./screen/MyBookingsScreen/index";
+import BookingScreen from "./screen/BookingScreen/index";
+import HomeScreen from "./screen/HomeScreen/index";
+import InfoScreen from "./screen/InfoScreen";
 import CredentialsModal from "./components/CredentialsModal";
 import PrivacyModal from "./components/PrivacyModal";
 import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
 import JoinShopPopup from "./components/JoinShopPopup";
 import BottomNav from "./components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-
-  
-  LogIn,
-  UserPlus,
-  CalendarDays,
-  Scissors,
-  Ban,
-  
-} from "lucide-react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
 
@@ -88,13 +84,7 @@ function formatDateHeader(dateString) {
   });
 }
 
-function formatCompactDate(dateString) {
-  return formatItalianDate(dateString, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
+
 
 function formatLongDate(dateString) {
   return formatItalianDate(dateString, {
@@ -489,9 +479,7 @@ function App() {
     return groups;
   }, [filteredAdminBookings]);
 
-  const adminBookingDays = useMemo(() => {
-    return Object.keys(groupedAdminBookings).sort();
-  }, [groupedAdminBookings]);
+  
 
   const groupedAdminServices = useMemo(() => {
     const groups = {};
@@ -975,6 +963,84 @@ async function loadShopSettings() {
       )
     );
   }
+  async function createAdminService(payload) {
+  const cleanCategory = String(payload.category || "").trim();
+  const cleanName = String(payload.name || "").trim();
+
+  if (!cleanCategory || !cleanName) {
+    alert("Inserisci almeno categoria e nome servizio.");
+    return false;
+  }
+
+  const { error } = await supabase
+    .from("services")
+    .insert([
+      {
+        shop_id: SHOP_ID,
+        category: cleanCategory,
+        category_description: payload.category_description || "",
+        icon: payload.icon || "✂️",
+        name: cleanName,
+        description: payload.description || "",
+        price: Number(payload.price || 0),
+        duration_minutes: 30,
+        active: true,
+        sort_order: Number(payload.sort_order || 0),
+      },
+    ]);
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile creare il servizio.");
+    return false;
+  }
+
+  await loadServices();
+  await loadAdminServices();
+
+  alert("Servizio creato.");
+  return true;
+}
+async function deleteAdminServiceCategory(categoryName) {
+  const cleanCategory = String(categoryName || "").trim();
+
+  if (!cleanCategory) {
+    alert("Categoria non valida.");
+    return false;
+  }
+
+  const confirmed = window.confirm(
+    `ATTENZIONE: stai per eliminare definitivamente la categoria "${cleanCategory}" e tutti i servizi contenuti al suo interno.\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+  );
+
+  if (!confirmed) return false;
+
+  const { data, error } = await supabase
+    .from("services")
+    .delete()
+    .eq("shop_id", SHOP_ID)
+    .eq("category", cleanCategory)
+    .select();
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile eliminare la categoria.");
+    return false;
+  }
+
+  if (!data || data.length === 0) {
+    alert("Nessun servizio eliminato. Probabile policy DELETE su Supabase o nome categoria non corrispondente.");
+    await loadAdminServices();
+    return false;
+  }
+
+  await loadServices();
+  await loadAdminServices();
+
+  alert("Categoria eliminata.");
+  return true;
+}  
+  
   async function saveAdminService(item) {
     const { error } = await supabase
       .from("services")
@@ -1002,6 +1068,40 @@ async function loadShopSettings() {
     await loadAdminServices();
     alert("Servizio aggiornato.");
   }
+async function deleteAdminService(item) {
+  const serviceName = String(item?.name || "questo servizio").trim();
+
+  const confirmed = window.confirm(
+    `ATTENZIONE: stai per eliminare definitivamente il servizio "${serviceName}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+  );
+
+  if (!confirmed) return false;
+
+  const { data, error } = await supabase
+    .from("services")
+    .delete()
+    .eq("id", item.id)
+    .eq("shop_id", SHOP_ID)
+    .select();
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile eliminare il servizio.");
+    return false;
+  }
+
+  if (!data || data.length === 0) {
+    alert("Nessun servizio eliminato. Verifica policy Supabase DELETE.");
+    await loadAdminServices();
+    return false;
+  }
+
+  await loadServices();
+  await loadAdminServices();
+
+  alert("Servizio eliminato.");
+  return true;
+}
 
   async function saveAdminImage(item) {
     const { error } = await supabase
@@ -1025,6 +1125,75 @@ async function loadShopSettings() {
     await loadAdminImages();
     alert("Immagine aggiornata.");
   }
+  async function createAdminHomeImage() {
+  if (adminImages.length >= 10) {
+    alert("Puoi caricare massimo 10 immagini Home.");
+    return null;
+  }
+
+  const nextSortOrder =
+    adminImages.length > 0
+      ? Math.min(...adminImages.map((item) => Number(item.sort_order) || 0)) - 1
+      : 1;
+
+  const { data, error } = await supabase
+    .from("home_images")
+    .insert([
+      {
+        shop_id: SHOP_ID,
+        title: "Nuova foto",
+        image_url: "",
+        active: true,
+        sort_order: nextSortOrder,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile creare la nuova immagine.");
+    return null;
+  }
+
+  await loadHomeImages();
+  await loadAdminImages();
+
+  return data;
+}
+
+async function deleteAdminHomeImage(item) {
+  const confirmed = window.confirm(
+    "Vuoi eliminare definitivamente questa immagine?"
+  );
+
+  if (!confirmed) return;
+
+  const { data, error } = await supabase
+    .from("home_images")
+    .delete()
+    .eq("id", item.id)
+    .eq("shop_id", SHOP_ID)
+    .select();
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile eliminare l’immagine.");
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    alert("Nessuna immagine eliminata. Probabile policy Supabase DELETE o ID non corrispondente.");
+    await loadAdminImages();
+    return;
+  }
+
+  await loadHomeImages();
+  await loadAdminImages();
+
+  alert("Immagine eliminata.");
+}
+  
   async function createAdminOperator(e) {
     e.preventDefault();
 
@@ -1802,7 +1971,14 @@ async function loadShopSettings() {
       alert("Scegli l’operatore con cui vuoi prenotare.");
       return;
     }
-
+if (!date || !time || !availableSlots.includes(time)) {
+  bookingSubmitLockRef.current = false;
+  setLoading(false);
+  alert("Questo giorno o orario non è disponibile. Scegli un altro slot.");
+  await loadAvailabilityBlocks();
+  await loadBookings();
+  return;
+}
     const alreadyBooked = isOperatorBookedAtSlot(bookings, date, time, selectedOperator.id);
 
     if (alreadyBooked) {
@@ -1813,15 +1989,49 @@ async function loadShopSettings() {
       return;
     }
 
-    const blockedByAvailability = isSlotBlockedByAvailability(time, date, availabilityBlocks);
+    const { data: freshAvailabilityBlocks, error: freshAvailabilityError } = await supabase
+  .from("availability_blocks")
+  .select("*")
+  .eq("shop_id", SHOP_ID)
+  .eq("active", true);
 
-    if (blockedByAvailability) {
-      bookingSubmitLockRef.current = false;
-      setLoading(false);
-      alert("Questo orario non è disponibile perché il salone risulta chiuso.");
-      await loadAvailabilityBlocks();
-      return;
-    }
+if (freshAvailabilityError) {
+  bookingSubmitLockRef.current = false;
+  setLoading(false);
+  console.error(freshAvailabilityError);
+  alert("Non è stato possibile verificare le disponibilità aggiornate del salone.");
+  return;
+}
+
+const currentAvailabilityBlocks = freshAvailabilityBlocks || availabilityBlocks;
+
+const blockedByAvailability = isSlotBlockedByAvailability(
+  time,
+  date,
+  currentAvailabilityBlocks
+);
+
+const currentAvailableSlots = slots.filter((slot) => {
+  if (isSlotBlockedByAvailability(slot, date, currentAvailabilityBlocks)) {
+    return false;
+  }
+
+  if (selectedOperator) {
+    return !isOperatorBookedAtSlot(bookings, date, slot, selectedOperator.id);
+  }
+
+  return false;
+});
+
+if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
+  bookingSubmitLockRef.current = false;
+  setLoading(false);
+  setTime("");
+  await loadAvailabilityBlocks();
+  await loadBookings();
+  alert("Questo giorno o orario non è disponibile perché il salone risulta chiuso o lo slot non è prenotabile.");
+  return;
+}
 
     const serviceLabel = selectedService
       ? `${selectedService.name} - €${selectedService.price}`
@@ -2074,6 +2284,7 @@ async function loadShopSettings() {
     date={date}
     setDate={setDate}
     time={time}
+    formatLongDate={formatLongDate}
     setTime={setTime}
     availableSlots={availableSlots}
     bookingAvailabilityNotice={bookingAvailabilityNotice}
@@ -2082,249 +2293,47 @@ async function loadShopSettings() {
   />
 )}
         {activePage === "my-bookings" && (
-          <section className="screen">
-            <header className="page-header my-bookings-header">
-              <button className="back-btn" onClick={() => setActivePage("home")}>
-                ←
-              </button>
-              <div>
-                <span className="eyebrow">Area personale</span>
-                <h1>Le tue prenotazioni</h1>
-              </div>
-            </header>
-
-            {!session?.user ? (
-              <div className="lookup-card">
-                <div>
-                  <span>Accesso richiesto</span>
-                  <strong>Accedi per vedere solo le tue prenotazioni.</strong>
-                </div>
-                <button className="primary-cta" type="button" onClick={() => setActivePage("account")}>
-                  Accedi o registrati
-                </button>
-              </div>
-            ) : (
-              <div className="customer-bookings-list">
-                {myBookings.length === 0 ? (
-                  <div className="empty-card compact">
-                    <strong>Nessuna prenotazione attiva</strong>
-                    <p>Quando prenoterai un appuntamento, lo troverai qui.</p>
-                  </div>
-                ) : (
-                  myBookings.map((booking) => (
-                    <article className="modern-booking-card user-booking-card" key={booking.id}>
-                      <div className="modern-booking-top">
-                        <div className="modern-time-pill">
-                          <span>Ore</span>
-                          <strong>{booking.time}</strong>
-                        </div>
-
-                        <div className="modern-date-block">
-                          <span>{formatDateHeader(booking.date)}</span>
-                          <strong>{formatLongDate(booking.date)}</strong>
-                        </div>
-                      </div>
-
-                      <div className="modern-booking-body">
-                        <span>Appuntamento</span>
-                        <h3>{booking.service}</h3>
-                        <p>{booking.name}</p>
-                      {booking.operator_name && <p>Operatore: {booking.operator_name}</p>}
-                      </div>
-
-                      <button className="soft-cancel-btn" onClick={() => deleteBooking(booking.id)}>
-                        Cancella prenotazione
-                      </button>
-                    </article>
-                  ))
-                )}
-              </div>
-            )}
-          </section>
-        )}
+  <MyBookingsScreen
+    setActivePage={setActivePage}
+    session={session}
+    myBookings={myBookings}
+    deleteBooking={deleteBooking}
+    formatDateHeader={formatDateHeader}
+    formatLongDate={formatLongDate}
+  />
+)}
 
         {activePage === "account" && (
-          <section className="screen">
-            <header className="page-header">
-              <button className="back-btn" onClick={() => setActivePage("home")}>
-                ←
-              </button>
-              <div>
-                <span className="eyebrow">Account</span>
-                <h1>Area cliente</h1>
-              </div>
-            </header>
-
-            {session?.user ? (
-              <div className="lookup-card">
-                <div>
-                  <span>Account attivo</span>
-                  <strong>{session.user.email}</strong>
-                  {userProfile?.full_name && <p>{userProfile.full_name}</p>}
-                  {userProfile?.phone && <p>{userProfile.phone}</p>}
-                  {isAdmin && <span>Profilo barbiere/admin</span>}
-                </div>
-                <button className="primary-cta" type="button" onClick={() => setActivePage("my-bookings")}>
-                  Vedi le mie prenotazioni
-                </button>
-                <button className="cancel-btn" type="button" onClick={logout}>
-                  Esci
-                </button>
-              </div>
-            ) : (
-              <form className="booking-form" onSubmit={handleAuth}>
-                <div className="folder-grid">
-                  <button
-                    type="button"
-                    className={authMode === "login" ? "folder-card active" : "folder-card"}
-                    onClick={() => setAuthMode("login")}
-                    disabled={authLoading}
-                  >
-                    <LogIn size={26} strokeWidth={2.2} />
-                    <strong>Accedi</strong>
-                    <p>Hai già un account</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={authMode === "register" ? "folder-card active" : "folder-card"}
-                    onClick={() => setAuthMode("register")}
-                    disabled={authLoading}
-                  >
-                    <UserPlus size={26} strokeWidth={2.2} />
-                    <strong>Registrati</strong>
-                    <p>Nuovo cliente</p>
-                  </button>
-                </div>
-
-                {authMode === "register" && (
-                  <>
-                    <label>Nome e cognome</label>
-                    <input
-                      type="text"
-                      placeholder="Es. Marco Rossi"
-                      value={authFullName}
-                      onChange={(e) => setAuthFullName(e.target.value)}
-                      disabled={authLoading}
-                      required
-                    />
-
-                    <label>Telefono</label>
-                    <input
-                      type="tel"
-                      placeholder="Es. 3331234567"
-                      value={authPhone}
-                      onChange={(e) => setAuthPhone(e.target.value)}
-                      disabled={authLoading}
-                      required
-                    />
-                  </>
-                )}
-
-                <label>Email</label>
-                <input
-                  type="email"
-                  placeholder="nome@email.com"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  disabled={authLoading}
-                  required
-                />
-
-                <label>Password</label>
-                <input
-                  type="password"
-                  placeholder="Minimo 6 caratteri"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  disabled={authLoading}
-                  required
-                />
-                {authMode === "login" && (
-                  <button
-                    className="forgot-password-btn"
-                    type="button"
-                    onClick={resetPassword}
-                    disabled={authLoading}
-                  >
-                    Password dimenticata?
-                  </button>
-                )}
-                <button className="primary-cta" type="submit" disabled={authLoading}>
-                  {authLoading
-                    ? "Attendi..."
-                    : authMode === "login"
-                    ? "Accedi"
-                    : "Crea account"}
-                </button>
-              </form>
-            )}
-          </section>
-        )}
+  <AccountScreen
+    setActivePage={setActivePage}
+    session={session}
+    userProfile={userProfile}
+    isAdmin={isAdmin}
+    logout={logout}
+    handleAuth={handleAuth}
+    authMode={authMode}
+    setAuthMode={setAuthMode}
+    authLoading={authLoading}
+    authFullName={authFullName}
+    setAuthFullName={setAuthFullName}
+    authPhone={authPhone}
+    setAuthPhone={setAuthPhone}
+    authEmail={authEmail}
+    setAuthEmail={setAuthEmail}
+    authPassword={authPassword}
+    setAuthPassword={setAuthPassword}
+    resetPassword={resetPassword}
+  />
+)}
 
         {activePage === "admin" && isAdmin && (
-          <section className="screen">
-            <header className="page-header">
-              <button className="back-btn" onClick={() => setActivePage("home")}>
-                ←
-              </button>
-              <div>
-                <span className="eyebrow">Admin</span>
-                <h1>Area Barbiere</h1>
-              </div>
-            </header>
-
-            <div className="admin-intro-card admin-agenda-intro">
-              <span>Pannello operativo</span>
-              <strong>
-                {adminTab === "agenda" && "Agenda appuntamenti"}
-                {adminTab === "content" && "Gestione salone"}
-                {adminTab === "availability" && "Disponibilità salone"}
-              </strong>
-              <p>
-                {adminTab === "agenda" && "La vista principale del barbiere: controlla la giornata, chiama i clienti e gestisci le prenotazioni."}
-                {adminTab === "content" && "Modifica servizi, prezzi, descrizioni e immagini della Home."}
-                {adminTab === "availability" && "Chiudi giorni interi, blocca fasce orarie o apri eccezionalmente giornate normalmente chiuse."}
-              </p>
-            </div>
-
-            <div className="folder-grid admin-main-tabs">
-              <button
-                type="button"
-                className={adminTab === "agenda" ? "folder-card active" : "folder-card"}
-                onClick={() => {
-                  setAdminTab("agenda");
-                  loadAdminBookings();
-                }}
-              >
-                <CalendarDays size={28} strokeWidth={2.2} />
-                <strong>Agenda</strong>
-                <p>Prenotazioni</p>
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "content" ? "folder-card active" : "folder-card"}
-                onClick={() => setAdminTab("content")}
-              >
-                <Scissors size={28} strokeWidth={2.2} />
-                <strong>Gestione</strong>
-                <p>Servizi e foto</p>
-              </button>
-
-              <button
-                type="button"
-                className={adminTab === "availability" ? "folder-card active" : "folder-card"}
-                onClick={() => {
-                  setAdminTab("availability");
-                  loadAvailabilityBlocks();
-                }}
-              >
-                <Ban size={28} strokeWidth={2.2} />
-                <strong>Disponibilità</strong>
-                <p>Chiusure e aperture</p>
-              </button>
-            </div>
+  <AdminScreen
+    setActivePage={setActivePage}
+    adminTab={adminTab}
+    setAdminTab={setAdminTab}
+    loadAdminBookings={loadAdminBookings}
+    loadAvailabilityBlocks={loadAvailabilityBlocks}
+  >
 
             {adminLoading && (
               <div className="empty-card compact">
@@ -2334,753 +2343,120 @@ async function loadShopSettings() {
             )}
 
             {!adminLoading && adminTab === "availability" && (
-              <div className="admin-panel availability-panel">
-                <div className="section-title">
-                  <h3>Disponibilità</h3>
-                  <span>{closureBlocks.length} chiusure · {exceptionalOpeningBlocks.length} aperture</span>
-                </div>
-
-                <div className="admin-help-card">
-                  <strong>Chiusure e aperture eccezionali</strong>
-                  <p>Le chiusure bloccano giorni o fasce orarie. Le aperture eccezionali riaprono una data specifica anche se esiste una chiusura ricorrente, per esempio un lunedì normalmente chiuso.</p>
-                </div>
-
-                <div className="admin-segmented">
-                  <button type="button" className={availabilityTab === "closures" ? "active" : ""} onClick={() => setAvailabilityTab("closures")}>
-                    Chiusure
-                  </button>
-                  <button type="button" className={availabilityTab === "openings" ? "active" : ""} onClick={() => setAvailabilityTab("openings")}>
-                    Aperture eccezionali
-                  </button>
-                </div>
-
-                {availabilityTab === "closures" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createAvailabilityBlock}>
-                      <div className="manual-booking-title">
-                        <span>Chiusura salone</span>
-                        <strong>Blocca disponibilità</strong>
-                        <p>Usa questa sezione per chiudere un giorno intero, una fascia oraria o una ricorrenza settimanale.</p>
-                      </div>
-
-                      <label>Tipo di blocco</label>
-                      <select value={availabilityMode} onChange={(e) => setAvailabilityMode(e.target.value)} disabled={availabilitySaving}>
-                        <option value="date_full_day">Giorno specifico - giornata intera</option>
-                        <option value="date_range">Giorno specifico - fascia oraria</option>
-                        <option value="recurring_full_day">Ricorrenza settimanale - giornata intera</option>
-                        <option value="recurring_range">Ricorrenza settimanale - fascia oraria</option>
-                      </select>
-
-                      {availabilityMode.startsWith("date") && (
-                        <>
-                          <label>Giorno</label>
-                          <input
-                            type="date"
-                            value={availabilityDate}
-                            onChange={(e) => setAvailabilityDate(e.target.value)}
-                            disabled={availabilitySaving}
-                            required
-                          />
-                        </>
-                      )}
-
-                      {availabilityMode.startsWith("recurring") && (
-                        <>
-                          <label>Giorno della settimana</label>
-                          <select value={availabilityWeekday} onChange={(e) => setAvailabilityWeekday(e.target.value)} disabled={availabilitySaving}>
-                            {weekdays.map((day) => (
-                              <option key={day.value} value={day.value}>
-                                {day.label}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      )}
-
-                      {availabilityMode.endsWith("range") && (
-                        <div className="admin-form-grid">
-                          <div>
-                            <label>Dalle</label>
-                            <select value={availabilityStartTime} onChange={(e) => setAvailabilityStartTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Inizio</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label>Alle</label>
-                            <select value={availabilityEndTime} onChange={(e) => setAvailabilityEndTime(e.target.value)} disabled={availabilitySaving} required>
-                              <option value="">Fine</option>
-                              {slots.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      <label>Motivo visibile solo al barbiere</label>
-                      <input
-                        type="text"
-                        placeholder="Es. ferie, pausa, evento, chiusura straordinaria..."
-                        value={availabilityReason}
-                        onChange={(e) => setAvailabilityReason(e.target.value)}
-                        disabled={availabilitySaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={availabilitySaving}>
-                        {availabilitySaving ? "Attendi..." : "Salva chiusura"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Chiusure attive</h3>
-                      <span>{sortedAvailabilityBlocks.length}</span>
-                    </div>
-
-                    {sortedAvailabilityBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna chiusura attiva</strong>
-                        <p>Quando bloccherai giorni o orari, li vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedAvailabilityBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>{block.recurring ? "Ogni" : "Tipo"}</span>
-                                <strong>{block.recurring ? "↻" : "1x"}</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>{block.recurring ? "Ricorrenza" : "Data"}</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Blocco</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Nessun motivo inserito"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi chiusura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {availabilityTab === "openings" && (
-                  <>
-                    <form className="manual-booking-form availability-form" onSubmit={createExceptionalOpening}>
-                      <div className="manual-booking-title">
-                        <span>Apertura eccezionale</span>
-                        <strong>Apri una data normalmente chiusa</strong>
-                        <p>Perfetto per aprire un lunedì, una domenica o una giornata che risulta chiusa da una ricorrenza. In quella data saranno prenotabili solo gli orari indicati qui.</p>
-                      </div>
-
-                      <label>Giorno da aprire</label>
-                      <input
-                        type="date"
-                        value={openingDate}
-                        onChange={(e) => setOpeningDate(e.target.value)}
-                        disabled={openingSaving}
-                        required
-                      />
-
-                      {openingDate && hasExceptionalOpeningForDate(openingDate, availabilityBlocks) && (
-                        <div className="availability-notice limited">
-                          <div className="availability-notice-icon">i</div>
-                          <div>
-                            <strong>Esiste già almeno un’apertura eccezionale per questa data.</strong>
-                            <p>Puoi aggiungere un’altra fascia oraria, per esempio mattina e pomeriggio separati.</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="admin-form-grid">
-                        <div>
-                          <label>Dalle</label>
-                          <select value={openingStartTime} onChange={(e) => setOpeningStartTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Apertura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label>Alle</label>
-                          <select value={openingEndTime} onChange={(e) => setOpeningEndTime(e.target.value)} disabled={openingSaving} required>
-                            <option value="">Chiusura</option>
-                            {slots.map((slot) => (
-                              <option key={slot} value={slot}>{slot}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <label>Nota interna</label>
-                      <input
-                        type="text"
-                        placeholder="Es. apertura speciale, recupero appuntamenti, evento..."
-                        value={openingReason}
-                        onChange={(e) => setOpeningReason(e.target.value)}
-                        disabled={openingSaving}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={openingSaving}>
-                        {openingSaving ? "Attendi..." : "Salva apertura eccezionale"}
-                      </button>
-                    </form>
-
-                    <div className="section-title availability-list-title">
-                      <h3>Aperture eccezionali</h3>
-                      <span>{sortedExceptionalOpeningBlocks.length}</span>
-                    </div>
-
-                    {sortedExceptionalOpeningBlocks.length === 0 ? (
-                      <div className="empty-card compact">
-                        <strong>Nessuna apertura eccezionale</strong>
-                        <p>Quando aprirai una data normalmente chiusa, la vedrai qui.</p>
-                      </div>
-                    ) : (
-                      <div className="availability-block-list">
-                        {sortedExceptionalOpeningBlocks.map((block) => (
-                          <article className="modern-booking-card availability-block-card" key={block.id}>
-                            <div className="modern-booking-top">
-                              <div className="modern-time-pill">
-                                <span>Open</span>
-                                <strong>✓</strong>
-                              </div>
-
-                              <div className="modern-date-block">
-                                <span>Apertura extra</span>
-                                <strong>{formatAvailabilityBlockTitle(block)}</strong>
-                              </div>
-                            </div>
-
-                            <div className="modern-booking-body">
-                              <span>Fascia prenotabile</span>
-                              <h3>{formatAvailabilityBlockTime(block)}</h3>
-                              <p>{getCleanAvailabilityReason(block) || "Apertura eccezionale"}</p>
-                            </div>
-
-                            <button
-                              className="admin-delete-booking-btn"
-                              type="button"
-                              disabled={availabilityDeletingId === block.id}
-                              onClick={() => deleteAvailabilityBlock(block)}
-                            >
-                              {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi apertura"}
-                            </button>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+  <AdminAvailability
+    closureBlocks={closureBlocks}
+    exceptionalOpeningBlocks={exceptionalOpeningBlocks}
+    availabilityTab={availabilityTab}
+    setAvailabilityTab={setAvailabilityTab}
+    createAvailabilityBlock={createAvailabilityBlock}
+    availabilityMode={availabilityMode}
+    setAvailabilityMode={setAvailabilityMode}
+    availabilitySaving={availabilitySaving}
+    availabilityDate={availabilityDate}
+    setAvailabilityDate={setAvailabilityDate}
+    availabilityWeekday={availabilityWeekday}
+    setAvailabilityWeekday={setAvailabilityWeekday}
+    weekdays={weekdays}
+    slots={slots}
+    availabilityStartTime={availabilityStartTime}
+    setAvailabilityStartTime={setAvailabilityStartTime}
+    availabilityEndTime={availabilityEndTime}
+    setAvailabilityEndTime={setAvailabilityEndTime}
+    availabilityReason={availabilityReason}
+    setAvailabilityReason={setAvailabilityReason}
+    sortedAvailabilityBlocks={sortedAvailabilityBlocks}
+    formatAvailabilityBlockTitle={formatAvailabilityBlockTitle}
+    formatAvailabilityBlockTime={formatAvailabilityBlockTime}
+    getCleanAvailabilityReason={getCleanAvailabilityReason}
+    availabilityDeletingId={availabilityDeletingId}
+    deleteAvailabilityBlock={deleteAvailabilityBlock}
+    createExceptionalOpening={createExceptionalOpening}
+    openingDate={openingDate}
+    setOpeningDate={setOpeningDate}
+    openingSaving={openingSaving}
+    hasExceptionalOpeningForDate={hasExceptionalOpeningForDate}
+    availabilityBlocks={availabilityBlocks}
+    openingStartTime={openingStartTime}
+    setOpeningStartTime={setOpeningStartTime}
+    openingEndTime={openingEndTime}
+    setOpeningEndTime={setOpeningEndTime}
+    openingReason={openingReason}
+    setOpeningReason={setOpeningReason}
+    sortedExceptionalOpeningBlocks={sortedExceptionalOpeningBlocks}
+  />
+)}
 
             {!adminLoading && adminTab === "content" && (
-              <div className="admin-panel">
-                                <div className="admin-segmented">
-                  <button type="button" className={adminContentTab === "services" ? "active" : ""} onClick={() => setAdminContentTab("services")}>
-                    Servizi e prezzi
-                  </button>
-                  <button type="button" className={adminContentTab === "photos" ? "active" : ""} onClick={() => setAdminContentTab("photos")}>
-                    Foto Home
-                  </button>
-                  <button type="button" className={adminContentTab === "operators" ? "active" : ""} onClick={() => {
-                    setAdminContentTab("operators");
-                    loadAdminOperators();
-                  }}>
-                    Operatori
-                  </button>
-                </div>
+  <AdminContent
+    createAdminService={createAdminService}
+    deleteAdminServiceCategory={deleteAdminServiceCategory}
+    adminContentTab={adminContentTab}
+    setAdminContentTab={setAdminContentTab}
+    loadAdminOperators={loadAdminOperators}
+    adminServices={adminServices}
+    adminServiceCategories={adminServiceCategories}
+    groupedAdminServices={groupedAdminServices}
+    updateAdminServiceField={updateAdminServiceField}
+    saveAdminService={saveAdminService}
+    deleteAdminService={deleteAdminService}
+    adminImages={adminImages}
+    cameraInputRefs={cameraInputRefs}
+    galleryInputRefs={galleryInputRefs}
+    uploadAdminHomeImage={uploadAdminHomeImage}
+    uploadingImageId={uploadingImageId}
+    updateAdminImageField={updateAdminImageField}
+    saveAdminImage={saveAdminImage}
+    createAdminHomeImage={createAdminHomeImage}
+    deleteAdminHomeImage={deleteAdminHomeImage}
+    adminOperators={adminOperators}
+    createAdminOperator={createAdminOperator}
+    newOperatorName={newOperatorName}
+    setNewOperatorName={setNewOperatorName}
+    newOperatorRole={newOperatorRole}
+    setNewOperatorRole={setNewOperatorRole}
+    newOperatorSortOrder={newOperatorSortOrder}
+    setNewOperatorSortOrder={setNewOperatorSortOrder}
+    operatorCreating={operatorCreating}
+    updateAdminOperatorField={updateAdminOperatorField}
+    operatorSavingId={operatorSavingId}
+    saveAdminOperator={saveAdminOperator}
+    operatorDeletingId={operatorDeletingId}
+    deleteAdminOperator={deleteAdminOperator}
+  />
+)}
 
-                {adminContentTab === "services" && (
-                  <>
-                    <div className="section-title">
-                      <h3>Servizi e prezzi</h3>
-                      <span>{adminServices.length} servizi</span>
-                    </div>
-
-                    <div className="admin-help-card">
-                      <strong>Come leggere questa sezione</strong>
-                      <p>Ogni scheda modifica un servizio. Puoi cambiare nome, prezzo, durata, categoria, descrizione e visibilità. Dopo ogni modifica premi “Salva servizio”.</p>
-                    </div>
-
-                    <div className="admin-service-groups">
-                      {adminServiceCategories.map((categoryName) => (
-                        <section className="admin-category-block" key={categoryName}>
-                          <div className="admin-category-title">
-                            <span>Categoria</span>
-                            <strong>{categoryName}</strong>
-                          </div>
-
-                          {groupedAdminServices[categoryName].map((item) => (
-                            <article className="admin-edit-card" key={item.id}>
-                              <div className="admin-card-head">
-                                <div className="admin-card-icon">{item.icon || "✂️"}</div>
-                                <div>
-                                  <span>{item.active ? "Attivo" : "Non attivo"}</span>
-                                  <strong>{item.name || "Servizio senza nome"}</strong>
-                                  <p>€{item.price} · {item.duration_minutes} minuti</p>
-                                </div>
-                              </div>
-
-                              <div className="admin-form-grid">
-                                <div>
-                                  <label>Categoria</label>
-                                  <input type="text" value={item.category || ""} onChange={(e) => updateAdminServiceField(item.id, "category", e.target.value)} />
-                                </div>
-
-                                <div>
-                                  <label>Icona</label>
-                                  <input type="text" value={item.icon || ""} onChange={(e) => updateAdminServiceField(item.id, "icon", e.target.value)} />
-                                </div>
-
-                                <div>
-                                  <label>Nome servizio</label>
-                                  <input type="text" value={item.name || ""} onChange={(e) => updateAdminServiceField(item.id, "name", e.target.value)} />
-                                </div>
-
-                                <div>
-                                  <label>Prezzo €</label>
-                                  <input type="number" value={item.price} onChange={(e) => updateAdminServiceField(item.id, "price", e.target.value)} />
-                                </div>
-
-                                <div>
-                                  <label>Durata minuti</label>
-                                  <input type="number" value={item.duration_minutes} onChange={(e) => updateAdminServiceField(item.id, "duration_minutes", e.target.value)} />
-                                </div>
-
-                                <div>
-                                  <label>Ordine</label>
-                                  <input type="number" value={item.sort_order} onChange={(e) => updateAdminServiceField(item.id, "sort_order", e.target.value)} />
-                                </div>
-                              </div>
-
-                              <label>Descrizione servizio</label>
-                              <input type="text" value={item.description || ""} onChange={(e) => updateAdminServiceField(item.id, "description", e.target.value)} />
-
-                              <label>Descrizione categoria</label>
-                              <input type="text" value={item.category_description || ""} onChange={(e) => updateAdminServiceField(item.id, "category_description", e.target.value)} />
-
-                              <label className="admin-toggle-row">
-                                <input type="checkbox" checked={item.active} onChange={(e) => updateAdminServiceField(item.id, "active", e.target.checked)} />
-                                <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
-                              </label>
-
-                              <button className="primary-cta" type="button" onClick={() => saveAdminService(item)}>
-                                Salva servizio
-                              </button>
-                            </article>
-                          ))}
-                        </section>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {adminContentTab === "photos" && (
-                  <>
-                    <div className="section-title">
-                      <h3>Foto Home</h3>
-                      <span>{adminImages.length} immagini</span>
-                    </div>
-
-                    <div className="admin-help-card">
-                      <strong>Carosello iniziale</strong>
-                      <p>Scatta una foto al momento oppure caricala dalla galleria del telefono. L’immagine verrà salvata nello Storage e collegata alla Home.</p>
-                    </div>
-
-                    <div className="admin-photo-list">
-                      {adminImages.map((item) => (
-                        <article className="admin-edit-card" key={item.id}>
-                          <div className="admin-photo-preview">
-                            {item.image_url ? (
-                              <img src={item.image_url} alt={item.title || "Foto Home"} />
-                            ) : (
-                              <div>Nessuna immagine</div>
-                            )}
-                          </div>
-
-                          <div className="admin-upload-actions">
-                            <input
-                              ref={(element) => {
-                                cameraInputRefs.current[item.id] = element;
-                              }}
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              style={{ display: "none" }}
-                              onChange={(e) => {
-                                uploadAdminHomeImage(item, e.target.files?.[0]);
-                                e.target.value = "";
-                              }}
-                            />
-
-                            <input
-                              ref={(element) => {
-                                galleryInputRefs.current[item.id] = element;
-                              }}
-                              type="file"
-                              accept="image/*"
-                              style={{ display: "none" }}
-                              onChange={(e) => {
-                                uploadAdminHomeImage(item, e.target.files?.[0]);
-                                e.target.value = "";
-                              }}
-                            />
-
-                            <button className="secondary-cta" type="button" disabled={uploadingImageId === item.id} onClick={() => cameraInputRefs.current[item.id]?.click()}>
-                              Scatta foto
-                            </button>
-
-                            <button className="secondary-cta" type="button" disabled={uploadingImageId === item.id} onClick={() => galleryInputRefs.current[item.id]?.click()}>
-                              Carica da galleria
-                            </button>
-                          </div>
-
-                          {uploadingImageId === item.id && (
-                            <div className="upload-status">
-                              Caricamento foto in corso...
-                            </div>
-                          )}
-
-                          <div className="admin-form-grid">
-                            <div>
-                              <label>Titolo foto</label>
-                              <input type="text" value={item.title || ""} onChange={(e) => updateAdminImageField(item.id, "title", e.target.value)} />
-                            </div>
-
-                            <div>
-                              <label>Ordine</label>
-                              <input type="number" value={item.sort_order} onChange={(e) => updateAdminImageField(item.id, "sort_order", e.target.value)} />
-                            </div>
-                          </div>
-
-                          <label>URL immagine</label>
-                          <input type="text" value={item.image_url || ""} onChange={(e) => updateAdminImageField(item.id, "image_url", e.target.value)} />
-
-                          <label className="admin-toggle-row">
-                            <input type="checkbox" checked={item.active} onChange={(e) => updateAdminImageField(item.id, "active", e.target.checked)} />
-                            <span>{item.active ? "Immagine visibile in Home" : "Immagine nascosta"}</span>
-                          </label>
-
-                          <button className="primary-cta" type="button" onClick={() => saveAdminImage(item)}>
-                            Salva immagine
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  </>
-                )}
-                              {adminContentTab === "operators" && (
-                  <>
-                    <div className="section-title">
-                      <h3>Operatori</h3>
-                      <span>{adminOperators.length} operatori</span>
-                    </div>
-
-                    <div className="admin-help-card">
-                      <strong>Operatori del salone</strong>
-                      <p>Gli operatori attivi saranno visibili al cliente in fase di prenotazione. Ogni operatore ha la propria disponibilità sugli slot.</p>
-                    </div>
-
-                    <form className="manual-booking-form" onSubmit={createAdminOperator}>
-                      <div className="manual-booking-title">
-                        <span>Nuovo operatore</span>
-                        <strong>Aggiungi barbiere o collaboratore</strong>
-                        <p>Inserisci il nome che il cliente vedrà durante la prenotazione.</p>
-                      </div>
-
-                      <label>Nome operatore</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Marco"
-                        value={newOperatorName}
-                        onChange={(e) => setNewOperatorName(e.target.value)}
-                        disabled={operatorCreating}
-                        required
-                      />
-
-                      <label>Ruolo / specializzazione</label>
-                      <input
-                        type="text"
-                        placeholder="Es. Barber, Hair stylist, Barba e rasatura..."
-                        value={newOperatorRole}
-                        onChange={(e) => setNewOperatorRole(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <label>Ordine</label>
-                      <input
-                        type="number"
-                        value={newOperatorSortOrder}
-                        onChange={(e) => setNewOperatorSortOrder(e.target.value)}
-                        disabled={operatorCreating}
-                      />
-
-                      <button className="primary-cta" type="submit" disabled={operatorCreating}>
-                        {operatorCreating ? "Creazione..." : "Aggiungi operatore"}
-                      </button>
-                    </form>
-
-                    <div className="admin-service-groups">
-                      {adminOperators.length === 0 ? (
-                        <div className="empty-card compact">
-                          <strong>Nessun operatore configurato</strong>
-                          <p>Aggiungi almeno un operatore per permettere ai clienti di prenotare.</p>
-                        </div>
-                      ) : (
-                        adminOperators.map((item) => (
-                          <article className="admin-edit-card" key={item.id}>
-                            <div className="admin-card-head">
-                              <div className="admin-card-icon">{String(item.name || "O").charAt(0).toUpperCase()}</div>
-                              <div>
-                                <span>{item.active ? "Attivo" : "Non attivo"}</span>
-                                <strong>{item.name || "Operatore senza nome"}</strong>
-                                <p>{item.role || "Nessun ruolo inserito"}</p>
-                              </div>
-                            </div>
-
-                            <div className="admin-form-grid">
-                              <div>
-                                <label>Nome</label>
-                                <input type="text" value={item.name || ""} onChange={(e) => updateAdminOperatorField(item.id, "name", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ruolo</label>
-                                <input type="text" value={item.role || ""} onChange={(e) => updateAdminOperatorField(item.id, "role", e.target.value)} />
-                              </div>
-
-                              <div>
-                                <label>Ordine</label>
-                                <input type="number" value={item.sort_order || 0} onChange={(e) => updateAdminOperatorField(item.id, "sort_order", e.target.value)} />
-                              </div>
-                            </div>
-
-                            <label className="admin-toggle-row">
-                              <input type="checkbox" checked={Boolean(item.active)} onChange={(e) => updateAdminOperatorField(item.id, "active", e.target.checked)} />
-                              <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
-                            </label>
-
-                            <button className="primary-cta" type="button" disabled={operatorSavingId === item.id} onClick={() => saveAdminOperator(item)}>
-                              {operatorSavingId === item.id ? "Salvataggio..." : "Salva operatore"}
-                            </button>
-
-                            <button className="admin-delete-booking-btn" type="button" disabled={operatorDeletingId === item.id} onClick={() => deleteAdminOperator(item)}>
-                              {operatorDeletingId === item.id ? "Eliminazione..." : "Elimina operatore"}
-                            </button>
-                          </article>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {!adminLoading && adminTab === "agenda" && (
-              <div className="admin-panel">
-                <div className="section-title">
-                  <h3>Agenda</h3>
-                  <span>{filteredAdminBookings.length} prenotazioni</span>
-                </div>
-
-                <div className="admin-help-card agenda-help-card">
-                  <strong>Vista appuntamenti</strong>
-                  <p>Le prenotazioni vecchie vengono eliminate automaticamente. Qui restano solo quelle di oggi e dei prossimi giorni.</p>
-                </div>
-
-                <button
-                  className="primary-cta manual-booking-toggle"
-                  type="button"
-                  onClick={() => setShowManualBookingForm((current) => !current)}
-                  disabled={manualBookingLoading}
-                >
-                  {showManualBookingForm ? "Chiudi inserimento rapido" : "Aggiungi prenotazione a nome di cliente"}
-                </button>
-
-                {showManualBookingForm && (
-                  <form className="manual-booking-form" onSubmit={createManualBooking}>
-                    <div className="manual-booking-title">
-                      <span>Telefonata / banco</span>
-                      <strong>Blocca uno slot in agenda</strong>
-                      <p>Inserisci una nota interna o il servizio richiesto dal cliente.</p>
-                    </div>
-
-                    <label>Nome cliente</label>
-                    <input
-                      type="text"
-                      placeholder="Es. Marco Rossi"
-                      value={manualName}
-                      onChange={(e) => setManualName(e.target.value)}
-                      disabled={manualBookingLoading}
-                      required
-                    />
-
-                    <label>Telefono</label>
-                    <input
-                      type="tel"
-                      placeholder="Es. 3331234567"
-                      value={manualPhone}
-                      onChange={(e) => setManualPhone(e.target.value)}
-                      disabled={manualBookingLoading}
-                      required
-                    />
-
-                    <label>Servizio o nota</label>
-
-                    <input
-                      type="text"
-                      placeholder="Es. taglio, barba, sistemazione veloce..."
-                      value={manualService}
-                      onChange={(e) => setManualService(e.target.value)}
-                      disabled={manualBookingLoading}
-                    />
-                                          <label>Operatore</label>
-                    <select
-                      value={manualOperatorId}
-                      onChange={(e) => {
-                        setManualOperatorId(e.target.value);
-                        setManualTime("");
-                      }}
-                      disabled={manualBookingLoading || activeOperators.length === 0}
-                      required
-                    >
-                      <option value="">
-                        {activeOperators.length > 0 ? "Scegli operatore" : "Nessun operatore disponibile"}
-                      </option>
-                      {activeOperators.map((operator) => (
-                        <option key={operator.id} value={operator.id}>
-                          {operator.name}{operator.role ? ` · ${operator.role}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    
-                    <div className="admin-form-grid">
-                      <div>
-                        <label>Giorno</label>
-                        <input
-                          type="date"
-                          value={manualDate}
-                          onChange={(e) => {
-                            setManualDate(e.target.value);
-                            setManualTime("");
-                          }}
-                          disabled={manualBookingLoading}
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label>Ora</label>
-                        <select value={manualTime} onChange={(e) => setManualTime(e.target.value)} required disabled={!manualDate || manualBookingLoading}>
-                          <option value="">{manualDate ? "Scegli" : "Prima giorno"}</option>
-                          {manualAvailableSlots.map((slot) => (
-                            <option key={slot} value={slot}>{slot}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <button className="primary-cta" type="submit" disabled={manualBookingLoading}>
-                      {manualBookingLoading ? "Attendi..." : "Aggiungi in agenda"}
-                    </button>
-                  </form>
-                )}
-
-                <div className="admin-filter-row">
-                  <button type="button" className={adminAgendaFilter === "all" ? "filter-pill active" : "filter-pill"} onClick={() => setAdminAgendaFilter("all")}>
-                    Tutte
-                  </button>
-
-                  <button type="button" className={adminAgendaFilter === "today" ? "filter-pill active" : "filter-pill"} onClick={() => setAdminAgendaFilter("today")}>
-                    Oggi
-                  </button>
-
-                  <button type="button" className={adminAgendaFilter === "upcoming" ? "filter-pill active" : "filter-pill"} onClick={() => setAdminAgendaFilter("upcoming")}>
-                    Prossime
-                  </button>
-                </div>
-
-                <button className="primary-cta refresh-agenda-btn" type="button" onClick={loadAdminBookings}>
-                  Aggiorna agenda
-                </button>
-
-                {filteredAdminBookings.length === 0 ? (
-                  <div className="empty-card compact">
-                    <strong>Nessuna prenotazione</strong>
-                    <p>Quando arriveranno appuntamenti, li vedrai qui.</p>
-                  </div>
-                ) : (
-                  <div className="admin-agenda-groups">
-                    {adminBookingDays.map((day) => (
-                      <section className="admin-day-block modern-day-block" key={day}>
-                        <div className="modern-day-header">
-                          <div>
-                            <span>{formatCompactDate(day)}</span>
-                            <strong>{formatDateHeader(day)}</strong>
-                          </div>
-                          <p>{groupedAdminBookings[day].length} appuntamenti</p>
-                        </div>
-
-                        <div className="customer-bookings-list">
-                          {groupedAdminBookings[day].map((booking) => (
-                            <article className="modern-booking-card admin-booking-card" key={booking.id}>
-                              <div className="modern-booking-top">
-                                <div className="modern-time-pill">
-                                  <span>Ore</span>
-                                  <strong>{booking.time}</strong>
-                                </div>
-
-                                <div className="modern-date-block">
-                                  <span>Cliente</span>
-                                  <strong>{booking.name}</strong>
-                                </div>
-                              </div>
-
-                              <div className="modern-booking-body">
-                                <span>Servizio</span>
-                               <h3>{booking.service || "Prenotazione telefonica"}</h3>
-                                <p>Operatore: {booking.operator_name || "Non assegnato"}</p>
-                                <a className="phone-link" href={`tel:${booking.phone}`}>
-                                  {booking.phone}
-                                </a>
-                              </div>
-
-                              <button className="admin-delete-booking-btn" type="button" onClick={() => setAdminBookingToDelete(booking)}>
-                                Elimina prenotazione
-                              </button>
-                            </article>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        )}
+           {!adminLoading && adminTab === "agenda" && (
+  <AdminAgenda
+    adminAgendaFilter={adminAgendaFilter}
+    setAdminAgendaFilter={setAdminAgendaFilter}
+    loadAdminBookings={loadAdminBookings}
+    groupedAdminBookings={groupedAdminBookings}
+    formatDateHeader={formatDateHeader}
+    setAdminBookingToDelete={setAdminBookingToDelete}
+    filteredAdminBookings={filteredAdminBookings}
+    showManualBookingForm={showManualBookingForm}
+    setShowManualBookingForm={setShowManualBookingForm}
+    manualBookingLoading={manualBookingLoading}
+    createManualBooking={createManualBooking}
+    manualName={manualName}
+    setManualName={setManualName}
+    manualPhone={manualPhone}
+    setManualPhone={setManualPhone}
+    manualService={manualService}
+    setManualService={setManualService}
+    manualOperatorId={manualOperatorId}
+    setManualOperatorId={setManualOperatorId}
+    activeOperators={activeOperators}
+    manualDate={manualDate}
+    setManualDate={setManualDate}
+    manualTime={manualTime}
+    setManualTime={setManualTime}
+    manualAvailableSlots={manualAvailableSlots}
+  />
+)}
+            </AdminScreen>
+)}
+      
 
         {activePage === "info" && (
   <InfoScreen
