@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 function AdminOffers({
   adminOffers,
   createAdminOffer,
@@ -7,6 +9,26 @@ function AdminOffers({
   offerSaving,
   offerDeletingId,
 }) {
+  const [editingOfferId, setEditingOfferId] = useState("");
+
+  const hasOffer = adminOffers.length > 0;
+
+  async function handleCreateOffer() {
+    const created = await createAdminOffer();
+
+    if (created) {
+      setEditingOfferId("new");
+    }
+  }
+
+  async function handleSaveOffer(item) {
+    const saved = await saveAdminOffer({ ...item, active: true });
+
+    if (saved) {
+      setEditingOfferId("");
+    }
+  }
+
   return (
     <div className="admin-panel">
       <div className="section-title">
@@ -15,21 +37,23 @@ function AdminOffers({
       </div>
 
       <div className="admin-help-card">
-        <strong>Promozioni visibili ai clienti</strong>
+        <strong>Promozione visibile ai clienti</strong>
         <p>
-          Qui puoi creare offerte da mostrare nella Home e nella schermata di prenotazione.
+          Puoi mostrare una sola offerta alla volta nella Home e nella schermata di prenotazione.
         </p>
       </div>
 
-      <button
-        className="admin-ghost-card"
-        type="button"
-        onClick={createAdminOffer}
-        disabled={offerSaving}
-      >
-        <span>+</span>
-        <strong>{offerSaving ? "Creazione..." : "Aggiungi offerta"}</strong>
-      </button>
+      {!hasOffer && (
+        <button
+          className="admin-ghost-card"
+          type="button"
+          onClick={handleCreateOffer}
+          disabled={offerSaving}
+        >
+          <span>+</span>
+          <strong>{offerSaving ? "Creazione..." : "Aggiungi offerta"}</strong>
+        </button>
+      )}
 
       <div className="admin-service-groups">
         {adminOffers.length === 0 ? (
@@ -38,60 +62,78 @@ function AdminOffers({
             <p>Aggiungi una promozione per mostrarla ai clienti.</p>
           </div>
         ) : (
-          adminOffers.map((item) => (
-            <article className="admin-edit-card" key={item.id}>
-              <div className="admin-form-grid">
-                <div>
-                  <label>Titolo offerta</label>
-                  <input
-                    type="text"
-                    value={item.title || ""}
-                    onChange={(e) => updateAdminOfferField(item.id, "title", e.target.value)}
-                    placeholder="Es. Mercoledì Taglio + Shampoo a 10€"
-                  />
-                </div>
-              </div>
+          adminOffers.map((item) => {
+            const isEditing = editingOfferId === item.id || editingOfferId === "new";
 
-              <label>Descrizione</label>
-              <input
-                type="text"
-                value={item.description || ""}
-                onChange={(e) => updateAdminOfferField(item.id, "description", e.target.value)}
-                placeholder="Es. Promo valida solo il mercoledì."
-              />
+            return (
+              <article className="admin-offer-card" key={item.id}>
+                {!isEditing ? (
+                  <>
+                    <div className="offer-banner admin-offer-preview">
+                      <span className="offer-banner-label">Offerta attiva</span>
+                      <strong>{item.title || "Nuova offerta"}</strong>
+                      {item.description && <p>{item.description}</p>}
+                    </div>
 
-               <label className="admin-toggle-row">
-  <input
-    type="checkbox"
-    checked={Boolean(item.active)}
-    onChange={(e) => {
-      const nextActive = e.target.checked;
-      updateAdminOfferField(item.id, "active", nextActive);
-      saveAdminOffer({ ...item, active: nextActive });
-    }}
-  />
-  <span>{item.active ? "Offerta visibile ai clienti" : "Offerta nascosta"}</span>
-</label>
+                    <button
+                      className="primary-cta"
+                      type="button"
+                      onClick={() => setEditingOfferId(item.id)}
+                    >
+                      Modifica offerta
+                    </button>
 
-              <button
-                className="primary-cta"
-                type="button"
-                disabled={offerSaving}
-                onClick={() => saveAdminOffer(item)}
-              >
-                {offerSaving ? "Salvataggio..." : "Salva offerta"}
-              </button>
+                    <button
+                      className="admin-delete-booking-btn"
+                      type="button"
+                      disabled={offerDeletingId === item.id}
+                      onClick={() => deleteAdminOffer(item)}
+                    >
+                      {offerDeletingId === item.id ? "Eliminazione..." : "Elimina offerta"}
+                    </button>
+                  </>
+                ) : (
+                  <div className="offer-banner admin-offer-form">
+                    <span className="offer-banner-label">Modifica offerta</span>
 
-              <button
-                className="admin-delete-booking-btn"
-                type="button"
-                disabled={offerDeletingId === item.id}
-                onClick={() => deleteAdminOffer(item)}
-              >
-                {offerDeletingId === item.id ? "Eliminazione..." : "Elimina offerta"}
-              </button>
-            </article>
-          ))
+                    <label>Titolo offerta</label>
+                    <input
+                      type="text"
+                      value={item.title || ""}
+                      onChange={(e) => updateAdminOfferField(item.id, "title", e.target.value)}
+                      placeholder="Es. Mercoledì Taglio + Shampoo a 10€"
+                    />
+
+                    <label>Descrizione</label>
+                    <input
+                      type="text"
+                      value={item.description || ""}
+                      onChange={(e) => updateAdminOfferField(item.id, "description", e.target.value)}
+                      placeholder="Es. Promo valida solo il mercoledì."
+                    />
+
+                    <button
+                      className="primary-cta"
+                      type="button"
+                      disabled={offerSaving}
+                      onClick={() => handleSaveOffer(item)}
+                    >
+                      {offerSaving ? "Salvataggio..." : "Salva offerta"}
+                    </button>
+
+                    <button
+                      className="admin-delete-booking-btn"
+                      type="button"
+                      disabled={offerDeletingId === item.id}
+                      onClick={() => deleteAdminOffer(item)}
+                    >
+                      {offerDeletingId === item.id ? "Eliminazione..." : "Elimina offerta"}
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })
         )}
       </div>
     </div>
