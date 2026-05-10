@@ -359,6 +359,10 @@ function App() {
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
   const [adminImages, setAdminImages] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [adminOffers, setAdminOffers] = useState([]);
+  const [offerSaving, setOfferSaving] = useState(false);
+  const [offerDeletingId, setOfferDeletingId] = useState("");
   const [adminOperators, setAdminOperators] = useState([]);
   const [operators, setOperators] = useState([]);
   const [adminBookings, setAdminBookings] = useState([]);
@@ -601,13 +605,14 @@ function App() {
   }, []);
 
     useEffect(() => {
-    loadShopSettings();
-    loadServices();
-    loadHomeImages();
-    loadBookings();
-    loadAvailabilityBlocks();
-    loadOperators();
-  }, []);
+  loadShopSettings();
+  loadServices();
+  loadHomeImages();
+  loadBookings();
+  loadAvailabilityBlocks();
+  loadOperators();
+  loadOffers();
+}, []);
 
   useEffect(() => {
     if (session?.user) {
@@ -870,6 +875,38 @@ async function loadShopSettings() {
 
     setAdminServices(data || []);
   }
+
+   async function loadOffers() {
+  const { data, error } = await supabase
+    .from("offers")
+    .select("*")
+    .eq("shop_id", SHOP_ID)
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setOffers(data || []);
+}
+
+async function loadAdminOffers() {
+  const { data, error } = await supabase
+    .from("offers")
+    .select("*")
+    .eq("shop_id", SHOP_ID)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    alert("Errore nel caricamento delle offerte.");
+    return;
+  }
+
+  setAdminOffers(data || []);
+}
 
   async function loadAdminImages() {
     const { data, error } = await supabase
