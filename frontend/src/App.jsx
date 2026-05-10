@@ -336,7 +336,7 @@ const defaultShopSettings = {
   hero_title: "Il tuo stile, prenotato in pochi secondi.",
   
   city: "Palermo",
-  opening_label: "Lun - Sab",
+  opening_label: "Mar - Sab",
   opening_hours: "09:00 - 18:30",
   phone: "333 123 4567",
 };
@@ -412,6 +412,7 @@ function App() {
 
   const cameraInputRefs = useRef({});
   const galleryInputRefs = useRef({});
+  const operatorImageInputRefs = useRef({});
   const authSubmitLockRef = useRef(false);
   const bookingSubmitLockRef = useRef(false);
   const manualBookingSubmitLockRef = useRef(false);
@@ -1252,11 +1253,12 @@ async function deleteAdminHomeImage(item) {
     const { error } = await supabase
       .from("operators")
       .update({
-        name: cleanName,
-        role: item.role || null,
-        active: Boolean(item.active),
-        sort_order: Number(item.sort_order || 0),
-      })
+  name: cleanName,
+  role: item.role || null,
+  image_url: item.image_url || null,
+  active: Boolean(item.active),
+  sort_order: Number(item.sort_order || 0),
+})
       .eq("id", item.id)
       .eq("shop_id", SHOP_ID);
 
@@ -1354,6 +1356,58 @@ async function deleteAdminHomeImage(item) {
     setUploadingImageId("");
     alert("Foto caricata correttamente.");
   }
+async function uploadAdminOperatorImage(item, file) {
+  if (!file) return;
+
+  setOperatorSavingId(item.id);
+
+  const extension = file.name.split(".").pop() || "jpg";
+  const cleanExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const filePath = `${SHOP_ID}/operators/operator-${item.id}-${Date.now()}.${cleanExtension || "jpg"}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("home-images")
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error(uploadError);
+    alert("Non è stato possibile caricare la foto dell’operatore.");
+    setOperatorSavingId("");
+    return;
+  }
+
+  const { data } = supabase.storage
+    .from("home-images")
+    .getPublicUrl(filePath);
+
+  const publicUrl = data.publicUrl;
+
+  const { error: updateError } = await supabase
+    .from("operators")
+    .update({
+      image_url: publicUrl,
+    })
+    .eq("id", item.id)
+    .eq("shop_id", SHOP_ID);
+
+  if (updateError) {
+    console.error(updateError);
+    alert("Foto caricata, ma non è stato possibile collegarla all’operatore.");
+    setOperatorSavingId("");
+    return;
+  }
+
+  await loadOperators();
+  await loadAdminOperators();
+  await loadBookings();
+  await loadAdminBookings();
+
+  setOperatorSavingId("");
+  alert("Foto operatore aggiornata.");
+}
 
   async function loadHomeImages() {
     const { data, error } = await supabase
@@ -2409,6 +2463,8 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     createAdminHomeImage={createAdminHomeImage}
     deleteAdminHomeImage={deleteAdminHomeImage}
     adminOperators={adminOperators}
+    operatorImageInputRefs={operatorImageInputRefs}
+    uploadAdminOperatorImage={uploadAdminOperatorImage}
     createAdminOperator={createAdminOperator}
     newOperatorName={newOperatorName}
     setNewOperatorName={setNewOperatorName}

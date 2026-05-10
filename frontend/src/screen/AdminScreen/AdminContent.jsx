@@ -22,6 +22,8 @@ export default function AdminContent({
   createAdminHomeImage,
   deleteAdminHomeImage,
   adminOperators,
+  operatorImageInputRefs,
+  uploadAdminOperatorImage,
   createAdminOperator,
   newOperatorName,
   setNewOperatorName,
@@ -553,12 +555,39 @@ export default function AdminContent({
                 return (
                   <article className="admin-edit-card" key={item.id}>
                     <div className="admin-card-head">
-                      <div className="admin-card-icon">{String(item.name || "O").charAt(0).toUpperCase()}</div>
-                      <div>
-                        <span>{item.active ? "Attivo" : "Non attivo"}</span>
-                        <strong>{item.name || "Operatore senza nome"}</strong>
-                        <p>{item.role || "Nessun ruolo inserito"}</p>
-                      </div>
+                      <div
+  className="admin-card-icon operator-photo-trigger"
+  onClick={() => operatorImageInputRefs.current[item.id]?.click()}
+>
+  {item.image_url ? (
+    <img
+      src={item.image_url}
+      alt={item.name || "Operatore"}
+      className="operator-avatar-image"
+    />
+  ) : (
+    String(item.name || "O").charAt(0).toUpperCase()
+  )}
+</div>
+
+<input
+  ref={(element) => {
+    operatorImageInputRefs.current[item.id] = element;
+  }}
+  type="file"
+  accept="image/*"
+  style={{ display: "none" }}
+  onChange={(e) => {
+    uploadAdminOperatorImage(item, e.target.files?.[0]);
+    e.target.value = "";
+  }}
+/>
+
+<div>
+  <span>{item.active ? "Attivo" : "Non attivo"}</span>
+  <strong>{item.name || "Operatore senza nome"}</strong>
+  <p>{item.role || "Nessun ruolo inserito"}</p>
+</div>
                     </div>
 
                     <button
