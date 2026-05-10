@@ -1983,6 +1983,10 @@ select:focus {
 .operator-avatar {
   width: 58px;
   height: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  min-height: 58px;
+  max-height: 58px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--text);
@@ -1990,6 +1994,17 @@ select:focus {
   place-items: center;
   font-size: 23px;
   font-weight: 900;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.operator-avatar .operator-avatar-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 999px;
 }
 
 .operator-choice.active .operator-avatar {
