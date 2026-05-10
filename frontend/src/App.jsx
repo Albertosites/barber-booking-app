@@ -909,6 +909,108 @@ async function loadAdminOffers() {
   setAdminOffers(data || []);
 }
 
+  async function createAdminOffer() {
+  setOfferSaving(true);
+
+  const { error } = await supabase
+    .from("offers")
+    .insert([
+      {
+        shop_id: SHOP_ID,
+        title: "Nuova offerta",
+        description: "",
+        active: true,
+      },
+    ]);
+
+  setOfferSaving(false);
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile creare l’offerta.");
+    return false;
+  }
+
+  await loadOffers();
+  await loadAdminOffers();
+
+  alert("Offerta creata.");
+  return true;
+}
+
+function updateAdminOfferField(id, field, value) {
+  setAdminOffers((current) =>
+    current.map((item) =>
+      item.id === id ? { ...item, [field]: value } : item
+    )
+  );
+}
+
+async function saveAdminOffer(item) {
+  const cleanTitle = String(item.title || "").trim();
+
+  if (!cleanTitle) {
+    alert("Il titolo dell’offerta non può essere vuoto.");
+    return false;
+  }
+
+  setOfferSaving(true);
+
+  const { error } = await supabase
+    .from("offers")
+    .update({
+      title: cleanTitle,
+      description: item.description || "",
+      active: Boolean(item.active),
+    })
+    .eq("id", item.id)
+    .eq("shop_id", SHOP_ID);
+
+  setOfferSaving(false);
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile salvare l’offerta.");
+    return false;
+  }
+
+  await loadOffers();
+  await loadAdminOffers();
+
+  alert("Offerta aggiornata.");
+  return true;
+}
+
+async function deleteAdminOffer(item) {
+  const confirmed = window.confirm(
+    `ATTENZIONE: stai per eliminare definitivamente l’offerta "${item.title || "senza titolo"}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+  );
+
+  if (!confirmed) return false;
+
+  setOfferDeletingId(item.id);
+
+  const { error } = await supabase
+    .from("offers")
+    .delete()
+    .eq("id", item.id)
+    .eq("shop_id", SHOP_ID);
+
+  setOfferDeletingId("");
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile eliminare l’offerta.");
+    return false;
+  }
+
+  await loadOffers();
+  await loadAdminOffers();
+
+  alert("Offerta eliminata.");
+  return true;
+}  
+  
   async function loadAdminImages() {
     const { data, error } = await supabase
       .from("home_images")
@@ -2521,8 +2623,14 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
 
    {!adminLoading && adminTab === "offers" && (
   <AdminOffers
-    adminOffers={adminOffers}
-  />
+  adminOffers={adminOffers}
+  createAdminOffer={createAdminOffer}
+  updateAdminOfferField={updateAdminOfferField}
+  saveAdminOffer={saveAdminOffer}
+  deleteAdminOffer={deleteAdminOffer}
+  offerSaving={offerSaving}
+  offerDeletingId={offerDeletingId}
+/>
 )}           
 
   {!adminLoading && adminTab === "agenda" && (
