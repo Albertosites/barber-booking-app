@@ -912,7 +912,7 @@ async function loadAdminOffers() {
   async function createAdminOffer() {
   setOfferSaving(true);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("offers")
     .insert([
       {
@@ -921,7 +921,9 @@ async function loadAdminOffers() {
         description: "",
         active: true,
       },
-    ]);
+    ])
+    .select()
+    .single();
 
   setOfferSaving(false);
 
@@ -931,10 +933,12 @@ async function loadAdminOffers() {
     return false;
   }
 
-  await loadOffers();
-  await loadAdminOffers();
+  if (data) {
+    setAdminOffers((current) => [data, ...current]);
+  }
 
-  alert("Offerta creata.");
+  await loadOffers();
+
   return true;
 }
 
