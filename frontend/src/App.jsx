@@ -1,3 +1,4 @@
+import AdminOffers from "./screen/AdminScreen/AdminOffers";
 import AdminContent from "./screen/AdminScreen/AdminContent";
 import AdminAvailability from "./screen/AdminScreen/AdminAvailability";
 import AdminAgenda from "./screen/AdminScreen/AdminAgenda";
@@ -2417,7 +2418,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
   />
 )}
 
-        {activePage === "admin" && isAdmin && (
+  {activePage === "admin" && isAdmin && (
   <AdminScreen
     setActivePage={setActivePage}
     adminTab={adminTab}
@@ -2518,7 +2519,13 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
   />
 )}
 
-           {!adminLoading && adminTab === "agenda" && (
+   {!adminLoading && adminTab === "offers" && (
+  <AdminOffers
+    adminOffers={adminOffers}
+  />
+)}           
+
+  {!adminLoading && adminTab === "agenda" && (
   <AdminAgenda
     adminAgendaFilter={adminAgendaFilter}
     setAdminAgendaFilter={setAdminAgendaFilter}
@@ -2547,7 +2554,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     manualAvailableSlots={manualAvailableSlots}
   />
 )}
-            </AdminScreen>
+</AdminScreen>
 )}
       
 
