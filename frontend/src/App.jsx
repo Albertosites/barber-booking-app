@@ -346,8 +346,12 @@ function App() {
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
- 
-
+  const [currentShopId, setCurrentShopId] = useState(SHOP_ID);
+  const [linkedShops, setLinkedShops] = useState([]);
+  const [shopSelectionRequired, setShopSelectionRequired] = useState(false);
+  const activeShopId = currentShopId || SHOP_ID;
+  
+  
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
 
@@ -620,6 +624,7 @@ function App() {
       loadUserProfile(session.user.id);
       loadMyBookings(session.user.id);
       checkAdmin(session.user.id);
+      loadLinkedShops(session.user.id);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -762,7 +767,7 @@ async function loadShopSettings() {
       .from("shop_members")
       .select("id")
       .eq("user_id", userId)
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .maybeSingle();
 
     if (error) {
@@ -775,7 +780,7 @@ async function loadShopSettings() {
 
   async function joinCurrentShop() {
     const { error } = await supabase.rpc("join_current_shop", {
-      target_shop_id: SHOP_ID,
+      target_shop_id: activeShopId,
     });
 
     if (error) {
@@ -825,7 +830,7 @@ async function loadShopSettings() {
       .from("shop_members")
       .select("role")
       .eq("user_id", userId)
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .maybeSingle();
 
     if (error) {
@@ -836,6 +841,45 @@ async function loadShopSettings() {
 
     setIsAdmin(data?.role === "admin");
   }
+
+  async function loadLinkedShops(userId) {
+  const { data, error } = await supabase
+    .from("shop_members")
+    .select(`
+      role,
+      shop_id,
+      shops (
+        id,
+        name,
+        slug,
+        active
+      )
+    `)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  const validShops = (data || [])
+    .map((item) => ({
+      role: item.role,
+      ...(item.shops || {}),
+    }))
+    .filter((shop) => shop.id && shop.active !== false);
+
+  setLinkedShops(validShops);
+
+  if (validShops.length <= 1) {
+    setShopSelectionRequired(false);
+    return validShops;
+  }
+
+  setShopSelectionRequired(true);
+
+  return validShops;
+}
 
  async function deleteOldBookings() {
   const { error } = await supabase.rpc("delete_old_bookings");
@@ -866,7 +910,7 @@ async function loadShopSettings() {
     const { data, error } = await supabase
       .from("services")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .order("sort_order", { ascending: true });
 
     if (error) {
@@ -882,7 +926,7 @@ async function loadShopSettings() {
   const { data, error } = await supabase
     .from("offers")
     .select("*")
-    .eq("shop_id", SHOP_ID)
+    .eq("shop_id", activeShopId)
     .eq("active", true)
     .order("created_at", { ascending: false });
 
@@ -898,7 +942,7 @@ async function loadAdminOffers() {
   const { data, error } = await supabase
     .from("offers")
     .select("*")
-    .eq("shop_id", SHOP_ID)
+    .eq("shop_id", activeShopId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -1015,7 +1059,7 @@ async function deleteAdminOffer(item) {
     const { data, error } = await supabase
       .from("home_images")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .order("sort_order", { ascending: true });
 
     if (error) {
@@ -1030,7 +1074,7 @@ async function deleteAdminOffer(item) {
     const { data, error } = await supabase
       .from("operators")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .eq("active", true)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true });
@@ -1048,7 +1092,7 @@ async function deleteAdminOffer(item) {
     const { data, error } = await supabase
       .from("operators")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true });
 
@@ -1067,7 +1111,7 @@ async function deleteAdminOffer(item) {
     const { data, error } = await supabase
       .from("bookings")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .gte("date", getTodayString())
       .order("date", { ascending: true })
       .order("time", { ascending: true });
@@ -1553,7 +1597,7 @@ async function uploadAdminOperatorImage(item, file) {
     const { data, error } = await supabase
       .from("home_images")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .eq("active", true)
       .order("sort_order", { ascending: true });
 
@@ -1580,7 +1624,7 @@ async function uploadAdminOperatorImage(item, file) {
     const { data, error } = await supabase
       .from("services")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .eq("active", true)
       .order("sort_order", { ascending: true });
 
@@ -1626,7 +1670,7 @@ async function uploadAdminOperatorImage(item, file) {
     const { data, error } = await supabase
       .from("availability_blocks")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .eq("active", true)
       .order("created_at", { ascending: false });
 
@@ -1818,7 +1862,7 @@ async function uploadAdminOperatorImage(item, file) {
     const { data, error } = await supabase
       .from("bookings")
       .select("*")
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .gte("date", getTodayString())
       .order("date", { ascending: true })
       .order("time", { ascending: true });
@@ -1837,7 +1881,7 @@ async function uploadAdminOperatorImage(item, file) {
       .from("bookings")
       .select("*")
       .eq("user_id", userId)
-      .eq("shop_id", SHOP_ID)
+      .eq("shop_id", activeShopId)
       .gte("date", getTodayString())
       .order("date", { ascending: true })
       .order("time", { ascending: true });
