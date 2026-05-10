@@ -25,6 +25,7 @@ function HomeScreen({
   loadAdminBookings,
   servicesLoading,
   serviceCategories,
+  offers,
 }) {
   return (
     <section className="screen">
@@ -54,7 +55,12 @@ function HomeScreen({
         shopAddressLine={shopAddressLine}
         shopSettings={shopSettings}
       />
-
+      {offers?.length > 0 && (
+  <div className="admin-help-card">
+    <strong>{offers[0].title}</strong>
+    {offers[0].description && <p>{offers[0].description}</p>}
+  </div>
+)}
       <HomeCTA
         isAdmin={isAdmin}
         setAdminTab={setAdminTab}

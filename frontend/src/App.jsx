@@ -2459,6 +2459,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     loadAdminBookings={loadAdminBookings}
     servicesLoading={servicesLoading}
     serviceCategories={serviceCategories}
+    offers={offers}
   />
 )}
 {activePage === "book" && (
