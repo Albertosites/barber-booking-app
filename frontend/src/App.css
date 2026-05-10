@@ -1172,6 +1172,11 @@ select:focus {
   box-shadow: 0 12px 30px rgba(216, 38, 76, 0.22);
 }
 
+.home-offer-banner {
+  margin-top: 16px;
+  margin-bottom: 22px;
+}
+
 .offer-banner-label {
   width: fit-content;
   padding: 6px 10px;
