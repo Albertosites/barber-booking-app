@@ -24,6 +24,7 @@ function BookingScreen({
   loading,
   handleSubmit,
   formatLongDate,
+  offers,
 }) {
   return (
     <section className="screen">
@@ -32,6 +33,14 @@ function BookingScreen({
       <BookingAvailabilityNotice
         bookingAvailabilityNotice={bookingAvailabilityNotice}
       />
+
+      {offers?.length > 0 && (
+        <div className="offer-banner">
+          <span className="offer-banner-label">Offerta attiva</span>
+          <strong>{offers[0].title}</strong>
+          {offers[0].description && <p>{offers[0].description}</p>}
+        </div>
+      )}
 
       <BookingForm
         bookingAvailabilityNotice={bookingAvailabilityNotice}
@@ -54,12 +63,12 @@ function BookingScreen({
       />
 
       <BookingSummary
-  selectedService={selectedService}
-  selectedOperator={selectedOperator}
-  date={date}
-  time={time}
-  formatLongDate={formatLongDate}
-/>
+        selectedService={selectedService}
+        selectedOperator={selectedOperator}
+        date={date}
+        time={time}
+        formatLongDate={formatLongDate}
+      />
     </section>
   );
 }

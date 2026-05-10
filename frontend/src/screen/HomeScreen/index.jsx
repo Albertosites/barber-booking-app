@@ -56,7 +56,8 @@ function HomeScreen({
         shopSettings={shopSettings}
       />
       {offers?.length > 0 && (
-  <div className="admin-help-card">
+  <div className="offer-banner">
+    <span className="offer-banner-label">Offerta attiva</span>
     <strong>{offers[0].title}</strong>
     {offers[0].description && <p>{offers[0].description}</p>}
   </div>

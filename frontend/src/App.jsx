@@ -846,20 +846,21 @@ async function loadShopSettings() {
 }
 
   async function loadAdminData() {
-    setAdminLoading(true);
+  setAdminLoading(true);
 
-    await deleteOldBookings();
+  await deleteOldBookings();
 
-        await Promise.all([
-      loadAdminServices(),
-      loadAdminImages(),
-      loadAdminOperators(),
-      loadAdminBookings(),
-      loadAvailabilityBlocks(),
-    ]);
+  await Promise.all([
+    loadAdminServices(),
+    loadAdminImages(),
+    loadAdminOperators(),
+    loadAdminBookings(),
+    loadAvailabilityBlocks(),
+    loadAdminOffers(),
+  ]);
 
-    setAdminLoading(false);
-  }
+  setAdminLoading(false);
+}
 
   async function loadAdminServices() {
     const { data, error } = await supabase
@@ -2484,7 +2485,8 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     bookingAvailabilityNotice={bookingAvailabilityNotice}
     loading={loading}
     handleSubmit={handleSubmit}
-  />
+    offers={offers}
+    />
 )}
         {activePage === "my-bookings" && (
   <MyBookingsScreen
