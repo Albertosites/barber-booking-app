@@ -1,6 +1,4 @@
-import AdminContent from "./AdminContent";
-import AdminAgenda from "./AdminAgenda";
-import { CalendarDays, Scissors, Ban } from "lucide-react";
+import { CalendarDays, Scissors, Ban, BadgePercent } from "lucide-react";
 
 function AdminScreen({
   setActivePage,
@@ -28,6 +26,7 @@ function AdminScreen({
           {adminTab === "agenda" && "Agenda appuntamenti"}
           {adminTab === "content" && "Gestione salone"}
           {adminTab === "availability" && "Disponibilità salone"}
+          {adminTab === "offers" && "Offerte salone"}
         </strong>
         <p>
           {adminTab === "agenda" &&
@@ -36,6 +35,8 @@ function AdminScreen({
             "Modifica servizi, prezzi, descrizioni e immagini della Home."}
           {adminTab === "availability" &&
             "Chiudi giorni interi, blocca fasce orarie o apri eccezionalmente giornate normalmente chiuse."}
+          {adminTab === "offers" &&
+            "Crea e gestisci offerte visibili ai clienti nella Home e nella schermata di prenotazione."}
         </p>
       </div>
 
@@ -74,6 +75,16 @@ function AdminScreen({
           <Ban size={28} strokeWidth={2.2} />
           <strong>Disponibilità</strong>
           <p>Chiusure e aperture</p>
+        </button>
+
+        <button
+          type="button"
+          className={adminTab === "offers" ? "folder-card active" : "folder-card"}
+          onClick={() => setAdminTab("offers")}
+        >
+          <BadgePercent size={28} strokeWidth={2.2} />
+          <strong>Offerte</strong>
+          <p>Promo clienti</p>
         </button>
       </div>
 
