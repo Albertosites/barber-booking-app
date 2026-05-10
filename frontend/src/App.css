@@ -1162,7 +1162,7 @@ select:focus {
   background: linear-gradient(135deg, #d8264c 0%, #ff5f7f 100%);
   border-radius: 24px;
   padding: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 22px 0 18px;
   color: white;
   display: flex;
   flex-direction: column;
