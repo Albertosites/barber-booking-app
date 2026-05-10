@@ -60,14 +60,18 @@ function AdminOffers({
                 placeholder="Es. Promo valida solo il mercoledì."
               />
 
-              <label className="admin-toggle-row">
-                <input
-                  type="checkbox"
-                  checked={Boolean(item.active)}
-                  onChange={(e) => updateAdminOfferField(item.id, "active", e.target.checked)}
-                />
-                <span>{item.active ? "Offerta visibile ai clienti" : "Offerta nascosta"}</span>
-              </label>
+               <label className="admin-toggle-row">
+  <input
+    type="checkbox"
+    checked={Boolean(item.active)}
+    onChange={(e) => {
+      const nextActive = e.target.checked;
+      updateAdminOfferField(item.id, "active", nextActive);
+      saveAdminOffer({ ...item, active: nextActive });
+    }}
+  />
+  <span>{item.active ? "Offerta visibile ai clienti" : "Offerta nascosta"}</span>
+</label>
 
               <button
                 className="primary-cta"
