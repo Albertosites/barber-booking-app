@@ -144,8 +144,16 @@ function BookingForm({
         disabled={loading}
       >
         <span className="operator-avatar">
-          {String(operator.name || "O").charAt(0).toUpperCase()}
-        </span>
+  {operator.image_url ? (
+    <img
+      src={operator.image_url}
+      alt={operator.name || "Operatore"}
+      className="operator-avatar-image"
+    />
+  ) : (
+    String(operator.name || "O").charAt(0).toUpperCase()
+  )}
+</span>
         <strong>{operator.name}</strong>
         {operator.role && <p>{operator.role}</p>}
       </button>
