@@ -599,36 +599,49 @@ export default function AdminContent({
                     </button>
 
                     {isOperatorOpen && (
-                      <>
-                        <div className="admin-form-grid">
-                          <div>
-                            <label>Nome</label>
-                            <input type="text" value={item.name || ""} onChange={(e) => updateAdminOperatorField(item.id, "name", e.target.value)} />
-                          </div>
+  <>
+    <div className="admin-form-grid">
+      <div>
+        <label>Nome</label>
+        <input type="text" value={item.name || ""} onChange={(e) => updateAdminOperatorField(item.id, "name", e.target.value)} />
+      </div>
 
-                          <div>
-                            <label>Ruolo</label>
-                            <input type="text" value={item.role || ""} onChange={(e) => updateAdminOperatorField(item.id, "role", e.target.value)} />
-                          </div>
+      <div>
+        <label>Ruolo</label>
+        <input type="text" value={item.role || ""} onChange={(e) => updateAdminOperatorField(item.id, "role", e.target.value)} />
+      </div>
 
-                          <div>
-                            <label>Ordine</label>
-                            <input type="number" value={item.sort_order || 0} onChange={(e) => updateAdminOperatorField(item.id, "sort_order", e.target.value)} />
-                          </div>
-                        </div>
+      <div>
+        <label>Ordine</label>
+        <input type="number" value={item.sort_order || 0} onChange={(e) => updateAdminOperatorField(item.id, "sort_order", e.target.value)} />
+      </div>
+    </div>
 
-                        <label className="admin-toggle-row">
-                          <input type="checkbox" checked={Boolean(item.active)} onChange={(e) => updateAdminOperatorField(item.id, "active", e.target.checked)} />
-                          <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
-                        </label>
+    <label className="admin-toggle-row">
+      <input type="checkbox" checked={Boolean(item.active)} onChange={(e) => updateAdminOperatorField(item.id, "active", e.target.checked)} />
+      <span>{item.active ? "Visibile ai clienti" : "Nascosto ai clienti"}</span>
+    </label>
 
-                        <button className="primary-cta" type="button" disabled={operatorSavingId === item.id} onClick={() => saveAdminOperator(item)}>
-                          {operatorSavingId === item.id ? "Salvataggio..." : "Salva operatore"}
-                        </button>
+    <button className="primary-cta" type="button" disabled={operatorSavingId === item.id} onClick={() => saveAdminOperator(item)}>
+      {operatorSavingId === item.id ? "Salvataggio..." : "Salva operatore"}
+    </button>
 
-                        <button className="admin-delete-booking-btn" type="button" disabled={operatorDeletingId === item.id} onClick={() => deleteAdminOperator(item)}>
-                          {operatorDeletingId === item.id ? "Eliminazione..." : "Elimina operatore"}
-                        </button>
+    {item.image_url && (
+      <button
+        className="secondary-cta"
+        type="button"
+        disabled={operatorSavingId === item.id}
+        onClick={() => {
+          updateAdminOperatorField(item.id, "image_url", "");
+        }}
+      >
+        Rimuovi foto
+      </button>
+    )}
+
+    <button className="admin-delete-booking-btn" type="button" disabled={operatorDeletingId === item.id} onClick={() => deleteAdminOperator(item)}>
+      {operatorDeletingId === item.id ? "Eliminazione..." : "Elimina operatore"}
+    </button>
                       </>
                     )}
                   </article>
