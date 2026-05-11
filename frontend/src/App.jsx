@@ -2007,9 +2007,15 @@ return validShops;
       const member = await isCurrentShopMember(data.user.id);
 
       setAuthEmail("");
-      setAuthPassword("");
+setAuthPassword("");
 
-      await loadUserProfile(data.user.id);
+localStorage.removeItem("barberbooking_current_shop_id");
+setCurrentShopId("");
+
+await loadUserProfile(data.user.id);
+await loadLinkedShops(data.user.id);
+
+      
 
       authSubmitLockRef.current = false;
       setAuthLoading(false);
