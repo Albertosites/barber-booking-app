@@ -2,6 +2,7 @@ function ShopSelectScreen({
   linkedShops,
   currentShopId,
   setCurrentShopId,
+  setShopChoiceCompleted,
 }) {
   return (
     <section className="screen shop-select-screen">
@@ -23,8 +24,8 @@ function ShopSelectScreen({
               type="button"
               className={isActive ? "shop-select-card active" : "shop-select-card"}
               onClick={() => {
-  localStorage.setItem("barberbooking_current_shop_id", shop.id);
   setCurrentShopId(shop.id);
+  setShopChoiceCompleted(true);
 }}
             >
               <div>

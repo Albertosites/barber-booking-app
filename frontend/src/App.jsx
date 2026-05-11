@@ -352,8 +352,14 @@ function App() {
   const [gallery, setGallery] = useState(fallbackGallery);
   const [currentShopId, setCurrentShopId] = useState("");
   const [shopGateReady, setShopGateReady] = useState(false);
+  const [shopChoiceCompleted, setShopChoiceCompleted] = useState(false);
   const [linkedShops, setLinkedShops] = useState([]);
   const activeShopId = currentShopId || SHOP_ID;
+  const canEnterShop =
+  Boolean(session) &&
+  shopGateReady &&
+  Boolean(currentShopId) &&
+  (linkedShops.length <= 1 || shopChoiceCompleted);
 
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -892,19 +898,26 @@ function App() {
   console.log("LINKED SHOPS DEBUG:", validShops);
 
   if (validShops.length === 0) {
-    setCurrentShopId("");
-    setShopGateReady(true);
-    return validShops;
-  }
+  setCurrentShopId("");
+  setShopChoiceCompleted(false);
+  setShopGateReady(true);
+  return validShops;
+}
 
-  if (validShops.length === 1) {
-    setCurrentShopId(validShops[0].id);
-    setShopGateReady(true);
-    return validShops;
-  }
+if (validShops.length === 1) {
+  setCurrentShopId(validShops[0].id);
+  setShopChoiceCompleted(true);
+  setShopGateReady(true);
+  return validShops;
+}
 
-  localStorage.removeItem("barberbooking_current_shop_id");
-setCurrentShopId("");
+const currentStillValid = validShops.some((shop) => shop.id === currentShopId);
+
+if (!shopChoiceCompleted || !currentStillValid) {
+  setCurrentShopId("");
+  setShopChoiceCompleted(false);
+}
+
 setShopGateReady(true);
 return validShops;
 }
@@ -2538,11 +2551,12 @@ await loadLinkedShops(data.user.id);
   </section>
 )}
 
-{session && shopGateReady && linkedShops.length > 1 && !currentShopId && (
+ {session && shopGateReady && linkedShops.length > 1 && !shopChoiceCompleted && ( 
   <ShopSelectScreen
     linkedShops={linkedShops}
     currentShopId={currentShopId}
     setCurrentShopId={setCurrentShopId}
+    setShopChoiceCompleted={setShopChoiceCompleted}
   />
 )}
         
@@ -2568,7 +2582,7 @@ await loadLinkedShops(data.user.id);
     resetPassword={resetPassword}
   />
 )}
-        {session && shopGateReady && currentShopId && activePage === "home" && (
+  {canEnterShop && activePage === "home" && (
   linkedShops.length > 1 && !currentShopId ? (
     <ShopSelectScreen
       linkedShops={linkedShops}
@@ -2602,8 +2616,8 @@ await loadLinkedShops(data.user.id);
   )
 )}
 
-        {session && shopGateReady && currentShopId && activePage === "book" && (
-          <BookingScreen
+           {canEnterShop && activePage === "book" && (
+        <BookingScreen
             setActivePage={setActivePage}
             serviceCategories={serviceCategories}
             servicesLoading={servicesLoading}
@@ -2628,7 +2642,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {session && shopGateReady && currentShopId && activePage === "my-bookings" && (
+        {canEnterShop && activePage === "my-bookings" && (
           <MyBookingsScreen
             setActivePage={setActivePage}
             session={session}
@@ -2639,7 +2653,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {session && shopGateReady && currentShopId && activePage === "account" && (
+        {canEnterShop && activePage === "account" && (
           <AccountScreen
             setActivePage={setActivePage}
             session={session}
@@ -2662,7 +2676,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {session && shopGateReady && currentShopId && activePage === "admin" && isAdmin && (
+        {canEnterShop && activePage === "admin" && isAdmin && (
           <AdminScreen
             setActivePage={setActivePage}
             adminTab={adminTab}
@@ -2806,7 +2820,7 @@ await loadLinkedShops(data.user.id);
           </AdminScreen>
         )}
 
-        {session && shopGateReady && currentShopId && activePage === "info" && (
+        {canEnterShop && activePage === "info" && (
           <InfoScreen
             setActivePage={setActivePage}
             shopSettings={shopSettings}
@@ -2853,7 +2867,7 @@ await loadLinkedShops(data.user.id);
         />
       )}
 
-      {session && shopGateReady && currentShopId && (
+      {canEnterShop && (
   <BottomNav
     activePage={activePage}
     setActivePage={setActivePage}
