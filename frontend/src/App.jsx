@@ -85,8 +85,6 @@ function formatDateHeader(dateString) {
   });
 }
 
-
-
 function formatLongDate(dateString) {
   return formatItalianDate(dateString, {
     weekday: "long",
@@ -187,6 +185,7 @@ function isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks) {
 function hasExceptionalOpeningForDate(dateString, availabilityBlocks) {
   return getExceptionalOpeningsForDate(dateString, availabilityBlocks).length > 0;
 }
+
 function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
   if (!dateString) return false;
 
@@ -220,6 +219,7 @@ function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
     return slotMinutes >= startMinutes && slotMinutes < endMinutes;
   });
 }
+
 function isOperatorBookedAtSlot(bookings, dateString, slot, operatorId) {
   if (!dateString || !slot || !operatorId) return false;
 
@@ -327,6 +327,7 @@ function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableS
 
   return null;
 }
+
 const defaultShopSettings = {
   logo_letter: "B",
   eyebrow: "Barber studio",
@@ -335,23 +336,24 @@ const defaultShopSettings = {
   address: "Via Roma 25",
   hero_badge: "Barber studio",
   hero_title: "Il tuo stile, prenotato in pochi secondi.",
-  
   city: "Palermo",
   opening_label: "Mar - Sab",
   opening_hours: "09:00 - 18:30",
   phone: "333 123 4567",
 };
+
 function App() {
   const [shopSettings, setShopSettings] = useState(defaultShopSettings);
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
-  const [currentShopId, setCurrentShopId] = useState(SHOP_ID);
+  const [currentShopId, setCurrentShopId] = useState(() => {
+  return localStorage.getItem("barberbooking_current_shop_id") || SHOP_ID;
+});
   const [linkedShops, setLinkedShops] = useState([]);
   const [shopSelectionRequired, setShopSelectionRequired] = useState(false);
   const activeShopId = currentShopId || SHOP_ID;
-  
-  
+
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
 
@@ -456,7 +458,9 @@ function App() {
   const activeOperators = useMemo(() => {
     return operators.filter((operator) => operator.active !== false);
   }, [operators]);
+
   const shopAddressLine = [shopSettings.address, shopSettings.city].filter(Boolean).join(", ");
+
   const today = useMemo(() => {
     return getTodayString();
   }, []);
@@ -488,8 +492,6 @@ function App() {
 
     return groups;
   }, [filteredAdminBookings]);
-
-  
 
   const groupedAdminServices = useMemo(() => {
     const groups = {};
@@ -545,7 +547,7 @@ function App() {
     });
   }, [exceptionalOpeningBlocks]);
 
-   const availableSlots = useMemo(() => {
+  const availableSlots = useMemo(() => {
     return slots.filter((slot) => {
       if (isSlotBlockedByAvailability(slot, date, availabilityBlocks)) {
         return false;
@@ -563,7 +565,7 @@ function App() {
     return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots);
   }, [availabilityBlocks, availableSlots, date]);
 
-   const manualAvailableSlots = useMemo(() => {
+  const manualAvailableSlots = useMemo(() => {
     return slots.filter((slot) => {
       if (isSlotBlockedByAvailability(slot, manualDate, availabilityBlocks)) {
         return false;
@@ -594,6 +596,8 @@ function App() {
       setSession(data.session);
     });
 
+ 
+
     const { data: listener } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
 
@@ -609,7 +613,13 @@ function App() {
     };
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
+  if (currentShopId) {
+    localStorage.setItem("barberbooking_current_shop_id", currentShopId);
+  }
+}, [currentShopId]);
+  
+  useEffect(() => {
   loadShopSettings();
   loadServices();
   loadHomeImages();
@@ -617,7 +627,18 @@ function App() {
   loadAvailabilityBlocks();
   loadOperators();
   loadOffers();
-}, []);
+
+  if (session?.user) {
+    loadMyBookings(session.user.id);
+    checkAdmin(session.user.id);
+
+    if (isAdmin) {
+      loadAdminData();
+    }
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [currentShopId]);
 
   useEffect(() => {
     if (session?.user) {
@@ -628,7 +649,7 @@ function App() {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, activeShopId]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -636,7 +657,7 @@ function App() {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdmin, activeShopId]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -674,8 +695,6 @@ function App() {
     setGalleryIndex(index);
   }
 
-  
-
   function openCredentialsModal() {
     setNewEmail(session?.user?.email || "");
     setNewPassword("");
@@ -684,9 +703,11 @@ function App() {
     setShowCredentialsModal(true);
     setShowProfileMenu(false);
   }
-async function loadShopSettings() {
-  setShopSettings(defaultShopSettings);
-}
+
+  async function loadShopSettings() {
+    setShopSettings(defaultShopSettings);
+  }
+
   function closeAllModals() {
     setShowPrivacyModal(false);
     setShowCredentialsModal(false);
@@ -812,6 +833,7 @@ async function loadShopSettings() {
       await loadUserProfile(data.session.user.id);
       await loadMyBookings(data.session.user.id);
       await checkAdmin(data.session.user.id);
+      await loadLinkedShops(data.session.user.id);
     }
 
     setJoinShopLoading(false);
@@ -843,68 +865,74 @@ async function loadShopSettings() {
   }
 
   async function loadLinkedShops(userId) {
-  const { data, error } = await supabase
-    .from("shop_members")
-    .select(`
-      role,
-      shop_id,
-      shops (
-        id,
-        name,
-        slug,
-        active
-      )
-    `)
-    .eq("user_id", userId);
+    const { data, error } = await supabase
+      .from("shop_members")
+      .select(`
+        role,
+        shop_id,
+        shops (
+          id,
+          name,
+          slug,
+          active
+        )
+      `)
+      .eq("user_id", userId);
 
-  if (error) {
-    console.error(error);
-    return [];
-  }
+    if (error) {
+      console.error(error);
+      return [];
+    }
 
-  const validShops = (data || [])
-    .map((item) => ({
-      role: item.role,
-      ...(item.shops || {}),
-    }))
-    .filter((shop) => shop.id && shop.active !== false);
+    const validShops = (data || [])
+      .map((item) => ({
+        role: item.role,
+        ...(item.shops || {}),
+      }))
+      .filter((shop) => shop.id && shop.active !== false);
 
-  setLinkedShops(validShops);
+    setLinkedShops(validShops);
 
-  if (validShops.length <= 1) {
-    setShopSelectionRequired(false);
-    return validShops;
-  }
-
-  setShopSelectionRequired(true);
-
+    if (validShops.length === 1) {
+  setCurrentShopId(validShops[0].id);
+  setShopSelectionRequired(false);
   return validShops;
 }
 
- async function deleteOldBookings() {
-  const { error } = await supabase.rpc("delete_old_bookings");
-
-  if (error) {
-    console.warn("Pulizia prenotazioni vecchie non eseguita:", error);
-  }
+if (validShops.length === 0) {
+  setShopSelectionRequired(false);
+  return validShops;
 }
+
+setShopSelectionRequired(true);
+
+    return validShops;
+  }
+
+  async function deleteOldBookings() {
+    const { error } = await supabase.rpc("delete_old_bookings");
+
+    if (error) {
+      console.warn("Pulizia prenotazioni vecchie non eseguita:", error);
+    }
+  }
 
   async function loadAdminData() {
-  setAdminLoading(true);
+    setAdminLoading(true);
 
-  await deleteOldBookings();
+    await deleteOldBookings();
 
-  await Promise.all([
-    loadAdminServices(),
-    loadAdminImages(),
-    loadAdminOperators(),
-    loadAdminBookings(),
-    loadAvailabilityBlocks(),
-    loadAdminOffers(),
-  ]);
+    await Promise.all([
+      loadAdminServices(),
+      loadAdminImages(),
+      loadAdminOperators(),
+      loadAdminBookings(),
+      loadAvailabilityBlocks(),
+      loadAdminOffers(),
+    ]);
 
-  setAdminLoading(false);
-}
+    setAdminLoading(false);
+  }
 
   async function loadAdminServices() {
     const { data, error } = await supabase
@@ -922,139 +950,139 @@ async function loadShopSettings() {
     setAdminServices(data || []);
   }
 
-   async function loadOffers() {
-  const { data, error } = await supabase
-    .from("offers")
-    .select("*")
-    .eq("shop_id", activeShopId)
-    .eq("active", true)
-    .order("created_at", { ascending: false });
+  async function loadOffers() {
+    const { data, error } = await supabase
+      .from("offers")
+      .select("*")
+      .eq("shop_id", activeShopId)
+      .eq("active", true)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error(error);
-    return;
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setOffers(data || []);
   }
 
-  setOffers(data || []);
-}
+  async function loadAdminOffers() {
+    const { data, error } = await supabase
+      .from("offers")
+      .select("*")
+      .eq("shop_id", activeShopId)
+      .order("created_at", { ascending: false });
 
-async function loadAdminOffers() {
-  const { data, error } = await supabase
-    .from("offers")
-    .select("*")
-    .eq("shop_id", activeShopId)
-    .order("created_at", { ascending: false });
+    if (error) {
+      console.error(error);
+      alert("Errore nel caricamento delle offerte.");
+      return;
+    }
 
-  if (error) {
-    console.error(error);
-    alert("Errore nel caricamento delle offerte.");
-    return;
+    setAdminOffers(data || []);
   }
-
-  setAdminOffers(data || []);
-}
 
   async function createAdminOffer() {
-  setOfferSaving(true);
+    setOfferSaving(true);
 
-  const { error } = await supabase
-    .from("offers")
-    .insert([
-      {
-        shop_id: SHOP_ID,
-        title: "Nuova offerta",
-        description: "",
-        active: true,
-      },
-    ]);
+    const { error } = await supabase
+      .from("offers")
+      .insert([
+        {
+          shop_id: activeShopId,
+          title: "Nuova offerta",
+          description: "",
+          active: true,
+        },
+      ]);
 
-  setOfferSaving(false);
+    setOfferSaving(false);
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile creare l’offerta.");
-    return false;
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile creare l’offerta.");
+      return false;
+    }
+
+    await loadOffers();
+    await loadAdminOffers();
+
+    return true;
   }
 
-  await loadOffers();
-  await loadAdminOffers();
-
-  return true;
-}
-
-function updateAdminOfferField(id, field, value) {
-  setAdminOffers((current) =>
-    current.map((item) =>
-      item.id === id ? { ...item, [field]: value } : item
-    )
-  );
-}
-
-async function saveAdminOffer(item) {
-  const cleanTitle = String(item.title || "").trim();
-
-  if (!cleanTitle) {
-    alert("Il titolo dell’offerta non può essere vuoto.");
-    return false;
+  function updateAdminOfferField(id, field, value) {
+    setAdminOffers((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
   }
 
-  setOfferSaving(true);
+  async function saveAdminOffer(item) {
+    const cleanTitle = String(item.title || "").trim();
 
-  const { error } = await supabase
-    .from("offers")
-    .update({
-      title: cleanTitle,
-      description: item.description || "",
-      active: Boolean(item.active),
-    })
-    .eq("id", item.id)
-    .eq("shop_id", SHOP_ID);
+    if (!cleanTitle) {
+      alert("Il titolo dell’offerta non può essere vuoto.");
+      return false;
+    }
 
-  setOfferSaving(false);
+    setOfferSaving(true);
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile salvare l’offerta.");
-    return false;
+    const { error } = await supabase
+      .from("offers")
+      .update({
+        title: cleanTitle,
+        description: item.description || "",
+        active: Boolean(item.active),
+      })
+      .eq("id", item.id)
+      .eq("shop_id", activeShopId);
+
+    setOfferSaving(false);
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile salvare l’offerta.");
+      return false;
+    }
+
+    await loadOffers();
+    await loadAdminOffers();
+
+    alert("Offerta aggiornata.");
+    return true;
   }
 
-  await loadOffers();
-  await loadAdminOffers();
+  async function deleteAdminOffer(item) {
+    const confirmed = window.confirm(
+      `ATTENZIONE: stai per eliminare definitivamente l’offerta "${item.title || "senza titolo"}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    );
 
-  alert("Offerta aggiornata.");
-  return true;
-}
+    if (!confirmed) return false;
 
-async function deleteAdminOffer(item) {
-  const confirmed = window.confirm(
-    `ATTENZIONE: stai per eliminare definitivamente l’offerta "${item.title || "senza titolo"}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
-  );
+    setOfferDeletingId(item.id);
 
-  if (!confirmed) return false;
+    const { error } = await supabase
+      .from("offers")
+      .delete()
+      .eq("id", item.id)
+      .eq("shop_id", activeShopId);
 
-  setOfferDeletingId(item.id);
+    setOfferDeletingId("");
 
-  const { error } = await supabase
-    .from("offers")
-    .delete()
-    .eq("id", item.id)
-    .eq("shop_id", SHOP_ID);
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare l’offerta.");
+      return false;
+    }
 
-  setOfferDeletingId("");
+    await loadOffers();
+    await loadAdminOffers();
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile eliminare l’offerta.");
-    return false;
+    alert("Offerta eliminata.");
+    return true;
   }
 
-  await loadOffers();
-  await loadAdminOffers();
-
-  alert("Offerta eliminata.");
-  return true;
-}  
-  
   async function loadAdminImages() {
     const { data, error } = await supabase
       .from("home_images")
@@ -1070,6 +1098,7 @@ async function deleteAdminOffer(item) {
 
     setAdminImages(data || []);
   }
+
   async function loadOperators() {
     const { data, error } = await supabase
       .from("operators")
@@ -1104,7 +1133,7 @@ async function deleteAdminOffer(item) {
 
     setAdminOperators(data || []);
   }
-  
+
   async function loadAdminBookings() {
     await deleteOldBookings();
 
@@ -1141,6 +1170,7 @@ async function deleteAdminOffer(item) {
       )
     );
   }
+
   function updateAdminOperatorField(id, field, value) {
     setAdminOperators((current) =>
       current.map((item) =>
@@ -1148,84 +1178,86 @@ async function deleteAdminOffer(item) {
       )
     );
   }
+
   async function createAdminService(payload) {
-  const cleanCategory = String(payload.category || "").trim();
-  const cleanName = String(payload.name || "").trim();
+    const cleanCategory = String(payload.category || "").trim();
+    const cleanName = String(payload.name || "").trim();
 
-  if (!cleanCategory || !cleanName) {
-    alert("Inserisci almeno categoria e nome servizio.");
-    return false;
-  }
+    if (!cleanCategory || !cleanName) {
+      alert("Inserisci almeno categoria e nome servizio.");
+      return false;
+    }
 
-  const { error } = await supabase
-    .from("services")
-    .insert([
-      {
-        shop_id: SHOP_ID,
-        category: cleanCategory,
-        category_description: payload.category_description || "",
-        icon: payload.icon || "✂️",
-        name: cleanName,
-        description: payload.description || "",
-        price: Number(payload.price || 0),
-        duration_minutes: 30,
-        active: true,
-        sort_order: Number(payload.sort_order || 0),
-      },
-    ]);
+    const { error } = await supabase
+      .from("services")
+      .insert([
+        {
+          shop_id: activeShopId,
+          category: cleanCategory,
+          category_description: payload.category_description || "",
+          icon: payload.icon || "✂️",
+          name: cleanName,
+          description: payload.description || "",
+          price: Number(payload.price || 0),
+          duration_minutes: 30,
+          active: true,
+          sort_order: Number(payload.sort_order || 0),
+        },
+      ]);
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile creare il servizio.");
-    return false;
-  }
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile creare il servizio.");
+      return false;
+    }
 
-  await loadServices();
-  await loadAdminServices();
-
-  alert("Servizio creato.");
-  return true;
-}
-async function deleteAdminServiceCategory(categoryName) {
-  const cleanCategory = String(categoryName || "").trim();
-
-  if (!cleanCategory) {
-    alert("Categoria non valida.");
-    return false;
-  }
-
-  const confirmed = window.confirm(
-    `ATTENZIONE: stai per eliminare definitivamente la categoria "${cleanCategory}" e tutti i servizi contenuti al suo interno.\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
-  );
-
-  if (!confirmed) return false;
-
-  const { data, error } = await supabase
-    .from("services")
-    .delete()
-    .eq("shop_id", SHOP_ID)
-    .eq("category", cleanCategory)
-    .select();
-
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile eliminare la categoria.");
-    return false;
-  }
-
-  if (!data || data.length === 0) {
-    alert("Nessun servizio eliminato. Probabile policy DELETE su Supabase o nome categoria non corrispondente.");
+    await loadServices();
     await loadAdminServices();
-    return false;
+
+    alert("Servizio creato.");
+    return true;
   }
 
-  await loadServices();
-  await loadAdminServices();
+  async function deleteAdminServiceCategory(categoryName) {
+    const cleanCategory = String(categoryName || "").trim();
 
-  alert("Categoria eliminata.");
-  return true;
-}  
-  
+    if (!cleanCategory) {
+      alert("Categoria non valida.");
+      return false;
+    }
+
+    const confirmed = window.confirm(
+      `ATTENZIONE: stai per eliminare definitivamente la categoria "${cleanCategory}" e tutti i servizi contenuti al suo interno.\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    );
+
+    if (!confirmed) return false;
+
+    const { data, error } = await supabase
+      .from("services")
+      .delete()
+      .eq("shop_id", activeShopId)
+      .eq("category", cleanCategory)
+      .select();
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare la categoria.");
+      return false;
+    }
+
+    if (!data || data.length === 0) {
+      alert("Nessun servizio eliminato. Probabile policy DELETE su Supabase o nome categoria non corrispondente.");
+      await loadAdminServices();
+      return false;
+    }
+
+    await loadServices();
+    await loadAdminServices();
+
+    alert("Categoria eliminata.");
+    return true;
+  }
+
   async function saveAdminService(item) {
     const { error } = await supabase
       .from("services")
@@ -1241,7 +1273,7 @@ async function deleteAdminServiceCategory(categoryName) {
         sort_order: Number(item.sort_order),
       })
       .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     if (error) {
       console.error(error);
@@ -1253,40 +1285,41 @@ async function deleteAdminServiceCategory(categoryName) {
     await loadAdminServices();
     alert("Servizio aggiornato.");
   }
-async function deleteAdminService(item) {
-  const serviceName = String(item?.name || "questo servizio").trim();
 
-  const confirmed = window.confirm(
-    `ATTENZIONE: stai per eliminare definitivamente il servizio "${serviceName}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
-  );
+  async function deleteAdminService(item) {
+    const serviceName = String(item?.name || "questo servizio").trim();
 
-  if (!confirmed) return false;
+    const confirmed = window.confirm(
+      `ATTENZIONE: stai per eliminare definitivamente il servizio "${serviceName}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    );
 
-  const { data, error } = await supabase
-    .from("services")
-    .delete()
-    .eq("id", item.id)
-    .eq("shop_id", SHOP_ID)
-    .select();
+    if (!confirmed) return false;
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile eliminare il servizio.");
-    return false;
-  }
+    const { data, error } = await supabase
+      .from("services")
+      .delete()
+      .eq("id", item.id)
+      .eq("shop_id", activeShopId)
+      .select();
 
-  if (!data || data.length === 0) {
-    alert("Nessun servizio eliminato. Verifica policy Supabase DELETE.");
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare il servizio.");
+      return false;
+    }
+
+    if (!data || data.length === 0) {
+      alert("Nessun servizio eliminato. Verifica policy Supabase DELETE.");
+      await loadAdminServices();
+      return false;
+    }
+
+    await loadServices();
     await loadAdminServices();
-    return false;
+
+    alert("Servizio eliminato.");
+    return true;
   }
-
-  await loadServices();
-  await loadAdminServices();
-
-  alert("Servizio eliminato.");
-  return true;
-}
 
   async function saveAdminImage(item) {
     const { error } = await supabase
@@ -1298,87 +1331,88 @@ async function deleteAdminService(item) {
         sort_order: Number(item.sort_order),
       })
       .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     if (error) {
       console.error(error);
       alert("Non è stato possibile salvare l’immagine.");
       return;
     }
- 
+
     await loadHomeImages();
     await loadAdminImages();
     alert("Immagine aggiornata.");
   }
+
   async function createAdminHomeImage() {
-  if (adminImages.length >= 10) {
-    alert("Puoi caricare massimo 10 immagini Home.");
-    return null;
-  }
+    if (adminImages.length >= 10) {
+      alert("Puoi caricare massimo 10 immagini Home.");
+      return null;
+    }
 
-  const nextSortOrder =
-    adminImages.length > 0
-      ? Math.min(...adminImages.map((item) => Number(item.sort_order) || 0)) - 1
-      : 1;
+    const nextSortOrder =
+      adminImages.length > 0
+        ? Math.min(...adminImages.map((item) => Number(item.sort_order) || 0)) - 1
+        : 1;
 
-  const { data, error } = await supabase
-    .from("home_images")
-    .insert([
-      {
-        shop_id: SHOP_ID,
-        title: "Nuova foto",
-        image_url: "",
-        active: true,
-        sort_order: nextSortOrder,
-      },
-    ])
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .from("home_images")
+      .insert([
+        {
+          shop_id: activeShopId,
+          title: "Nuova foto",
+          image_url: "",
+          active: true,
+          sort_order: nextSortOrder,
+        },
+      ])
+      .select()
+      .single();
 
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile creare la nuova immagine.");
-    return null;
-  }
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile creare la nuova immagine.");
+      return null;
+    }
 
-  await loadHomeImages();
-  await loadAdminImages();
-
-  return data;
-}
-
-async function deleteAdminHomeImage(item) {
-  const confirmed = window.confirm(
-    "Vuoi eliminare definitivamente questa immagine?"
-  );
-
-  if (!confirmed) return;
-
-  const { data, error } = await supabase
-    .from("home_images")
-    .delete()
-    .eq("id", item.id)
-    .eq("shop_id", SHOP_ID)
-    .select();
-
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile eliminare l’immagine.");
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    alert("Nessuna immagine eliminata. Probabile policy Supabase DELETE o ID non corrispondente.");
+    await loadHomeImages();
     await loadAdminImages();
-    return;
+
+    return data;
   }
 
-  await loadHomeImages();
-  await loadAdminImages();
+  async function deleteAdminHomeImage(item) {
+    const confirmed = window.confirm(
+      "Vuoi eliminare definitivamente questa immagine?"
+    );
 
-  alert("Immagine eliminata.");
-}
-  
+    if (!confirmed) return;
+
+    const { data, error } = await supabase
+      .from("home_images")
+      .delete()
+      .eq("id", item.id)
+      .eq("shop_id", activeShopId)
+      .select();
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile eliminare l’immagine.");
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      alert("Nessuna immagine eliminata. Probabile policy Supabase DELETE o ID non corrispondente.");
+      await loadAdminImages();
+      return;
+    }
+
+    await loadHomeImages();
+    await loadAdminImages();
+
+    alert("Immagine eliminata.");
+  }
+
   async function createAdminOperator(e) {
     e.preventDefault();
 
@@ -1398,7 +1432,7 @@ async function deleteAdminHomeImage(item) {
       .from("operators")
       .insert([
         {
-          shop_id: SHOP_ID,
+          shop_id: activeShopId,
           name: cleanName,
           role: cleanRole || null,
           active: true,
@@ -1437,14 +1471,14 @@ async function deleteAdminHomeImage(item) {
     const { error } = await supabase
       .from("operators")
       .update({
-  name: cleanName,
-  role: item.role || null,
-  image_url: item.image_url || null,
-  active: Boolean(item.active),
-  sort_order: Number(item.sort_order || 0),
-})
+        name: cleanName,
+        role: item.role || null,
+        image_url: item.image_url || null,
+        active: Boolean(item.active),
+        sort_order: Number(item.sort_order || 0),
+      })
       .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     setOperatorSavingId("");
 
@@ -1475,7 +1509,7 @@ async function deleteAdminHomeImage(item) {
       .from("operators")
       .delete()
       .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     setOperatorDeletingId("");
 
@@ -1490,6 +1524,7 @@ async function deleteAdminHomeImage(item) {
 
     alert("Operatore eliminato.");
   }
+
   async function uploadAdminHomeImage(item, file) {
     if (!file) return;
 
@@ -1497,7 +1532,7 @@ async function deleteAdminHomeImage(item) {
 
     const extension = file.name.split(".").pop() || "jpg";
     const cleanExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const filePath = `${SHOP_ID}/home-${item.id}-${Date.now()}.${cleanExtension || "jpg"}`;
+    const filePath = `${activeShopId}/home-${item.id}-${Date.now()}.${cleanExtension || "jpg"}`;
 
     const { error: uploadError } = await supabase.storage
       .from("home-images")
@@ -1525,7 +1560,7 @@ async function deleteAdminHomeImage(item) {
         image_url: publicUrl,
       })
       .eq("id", item.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     if (updateError) {
       console.error(updateError);
@@ -1540,58 +1575,59 @@ async function deleteAdminHomeImage(item) {
     setUploadingImageId("");
     alert("Foto caricata correttamente.");
   }
-async function uploadAdminOperatorImage(item, file) {
-  if (!file) return;
 
-  setOperatorSavingId(item.id);
+  async function uploadAdminOperatorImage(item, file) {
+    if (!file) return;
 
-  const extension = file.name.split(".").pop() || "jpg";
-  const cleanExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const filePath = `${SHOP_ID}/operators/operator-${item.id}-${Date.now()}.${cleanExtension || "jpg"}`;
+    setOperatorSavingId(item.id);
 
-  const { error: uploadError } = await supabase.storage
-    .from("home-images")
-    .upload(filePath, file, {
-      cacheControl: "3600",
-      upsert: true,
-    });
+    const extension = file.name.split(".").pop() || "jpg";
+    const cleanExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const filePath = `${activeShopId}/operators/operator-${item.id}-${Date.now()}.${cleanExtension || "jpg"}`;
 
-  if (uploadError) {
-    console.error(uploadError);
-    alert("Non è stato possibile caricare la foto dell’operatore.");
+    const { error: uploadError } = await supabase.storage
+      .from("home-images")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error(uploadError);
+      alert("Non è stato possibile caricare la foto dell’operatore.");
+      setOperatorSavingId("");
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("home-images")
+      .getPublicUrl(filePath);
+
+    const publicUrl = data.publicUrl;
+
+    const { error: updateError } = await supabase
+      .from("operators")
+      .update({
+        image_url: publicUrl,
+      })
+      .eq("id", item.id)
+      .eq("shop_id", activeShopId);
+
+    if (updateError) {
+      console.error(updateError);
+      alert("Foto caricata, ma non è stato possibile collegarla all’operatore.");
+      setOperatorSavingId("");
+      return;
+    }
+
+    await loadOperators();
+    await loadAdminOperators();
+    await loadBookings();
+    await loadAdminBookings();
+
     setOperatorSavingId("");
-    return;
+    alert("Foto operatore aggiornata.");
   }
-
-  const { data } = supabase.storage
-    .from("home-images")
-    .getPublicUrl(filePath);
-
-  const publicUrl = data.publicUrl;
-
-  const { error: updateError } = await supabase
-    .from("operators")
-    .update({
-      image_url: publicUrl,
-    })
-    .eq("id", item.id)
-    .eq("shop_id", SHOP_ID);
-
-  if (updateError) {
-    console.error(updateError);
-    alert("Foto caricata, ma non è stato possibile collegarla all’operatore.");
-    setOperatorSavingId("");
-    return;
-  }
-
-  await loadOperators();
-  await loadAdminOperators();
-  await loadBookings();
-  await loadAdminBookings();
-
-  setOperatorSavingId("");
-  alert("Foto operatore aggiornata.");
-}
 
   async function loadHomeImages() {
     const { data, error } = await supabase
@@ -1716,7 +1752,7 @@ async function uploadAdminOperatorImage(item, file) {
     setAvailabilitySaving(true);
 
     const payload = {
-      shop_id: SHOP_ID,
+      shop_id: activeShopId,
       block_date: isRecurring ? null : availabilityDate,
       weekday: isRecurring ? Number(availabilityWeekday) : null,
       start_time: isFullDay ? null : availabilityStartTime,
@@ -1788,7 +1824,7 @@ async function uploadAdminOperatorImage(item, file) {
     setOpeningSaving(true);
 
     const payload = {
-      shop_id: SHOP_ID,
+      shop_id: activeShopId,
       block_date: openingDate,
       weekday: null,
       start_time: openingStartTime,
@@ -1844,7 +1880,7 @@ async function uploadAdminOperatorImage(item, file) {
       .from("availability_blocks")
       .delete()
       .eq("id", block.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     setAvailabilityDeletingId("");
 
@@ -2043,6 +2079,7 @@ async function uploadAdminOperatorImage(item, file) {
       await joinCurrentShop();
       await loadMyBookings(signUpData.session.user.id);
       await checkAdmin(signUpData.session.user.id);
+      await loadLinkedShops(signUpData.session.user.id);
 
       authSubmitLockRef.current = false;
       setAuthLoading(false);
@@ -2203,20 +2240,22 @@ async function uploadAdminOperatorImage(item, file) {
       return;
     }
 
-        if (!selectedOperator) {
+    if (!selectedOperator) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
       alert("Scegli l’operatore con cui vuoi prenotare.");
       return;
     }
-if (!date || !time || !availableSlots.includes(time)) {
-  bookingSubmitLockRef.current = false;
-  setLoading(false);
-  alert("Questo giorno o orario non è disponibile. Scegli un altro slot.");
-  await loadAvailabilityBlocks();
-  await loadBookings();
-  return;
-}
+
+    if (!date || !time || !availableSlots.includes(time)) {
+      bookingSubmitLockRef.current = false;
+      setLoading(false);
+      alert("Questo giorno o orario non è disponibile. Scegli un altro slot.");
+      await loadAvailabilityBlocks();
+      await loadBookings();
+      return;
+    }
+
     const alreadyBooked = isOperatorBookedAtSlot(bookings, date, time, selectedOperator.id);
 
     if (alreadyBooked) {
@@ -2228,48 +2267,48 @@ if (!date || !time || !availableSlots.includes(time)) {
     }
 
     const { data: freshAvailabilityBlocks, error: freshAvailabilityError } = await supabase
-  .from("availability_blocks")
-  .select("*")
-  .eq("shop_id", SHOP_ID)
-  .eq("active", true);
+      .from("availability_blocks")
+      .select("*")
+      .eq("shop_id", activeShopId)
+      .eq("active", true);
 
-if (freshAvailabilityError) {
-  bookingSubmitLockRef.current = false;
-  setLoading(false);
-  console.error(freshAvailabilityError);
-  alert("Non è stato possibile verificare le disponibilità aggiornate del salone.");
-  return;
-}
+    if (freshAvailabilityError) {
+      bookingSubmitLockRef.current = false;
+      setLoading(false);
+      console.error(freshAvailabilityError);
+      alert("Non è stato possibile verificare le disponibilità aggiornate del salone.");
+      return;
+    }
 
-const currentAvailabilityBlocks = freshAvailabilityBlocks || availabilityBlocks;
+    const currentAvailabilityBlocks = freshAvailabilityBlocks || availabilityBlocks;
 
-const blockedByAvailability = isSlotBlockedByAvailability(
-  time,
-  date,
-  currentAvailabilityBlocks
-);
+    const blockedByAvailability = isSlotBlockedByAvailability(
+      time,
+      date,
+      currentAvailabilityBlocks
+    );
 
-const currentAvailableSlots = slots.filter((slot) => {
-  if (isSlotBlockedByAvailability(slot, date, currentAvailabilityBlocks)) {
-    return false;
-  }
+    const currentAvailableSlots = slots.filter((slot) => {
+      if (isSlotBlockedByAvailability(slot, date, currentAvailabilityBlocks)) {
+        return false;
+      }
 
-  if (selectedOperator) {
-    return !isOperatorBookedAtSlot(bookings, date, slot, selectedOperator.id);
-  }
+      if (selectedOperator) {
+        return !isOperatorBookedAtSlot(bookings, date, slot, selectedOperator.id);
+      }
 
-  return false;
-});
+      return false;
+    });
 
-if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
-  bookingSubmitLockRef.current = false;
-  setLoading(false);
-  setTime("");
-  await loadAvailabilityBlocks();
-  await loadBookings();
-  alert("Questo giorno o orario non è disponibile perché il salone risulta chiuso o lo slot non è prenotabile.");
-  return;
-}
+    if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
+      bookingSubmitLockRef.current = false;
+      setLoading(false);
+      setTime("");
+      await loadAvailabilityBlocks();
+      await loadBookings();
+      alert("Questo giorno o orario non è disponibile perché il salone risulta chiuso o lo slot non è prenotabile.");
+      return;
+    }
 
     const serviceLabel = selectedService
       ? `${selectedService.name} - €${selectedService.price}`
@@ -2285,7 +2324,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
         user_id: session.user.id,
         operator_id: selectedOperator.id,
         operator_name: selectedOperator.name,
-        shop_id: SHOP_ID,
+        shop_id: activeShopId,
       },
     ]);
 
@@ -2301,7 +2340,6 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     setOperatorId("");
     setDate("");
     setTime("");
-    
 
     await loadBookings();
     await loadMyBookings(session.user.id);
@@ -2325,7 +2363,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     const cleanPhone = manualPhone.trim();
     const cleanService = manualService.trim() || "Prenotazione telefonica";
 
-        if (!cleanName || !cleanPhone || !manualDate || !manualTime || !selectedManualOperator) {
+    if (!cleanName || !cleanPhone || !manualDate || !manualTime || !selectedManualOperator) {
       alert("Inserisci almeno nome, telefono, operatore, giorno e ora.");
       return;
     }
@@ -2333,7 +2371,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
     manualBookingSubmitLockRef.current = true;
     setManualBookingLoading(true);
 
-     const alreadyBooked = isOperatorBookedAtSlot(bookings, manualDate, manualTime, selectedManualOperator.id);
+    const alreadyBooked = isOperatorBookedAtSlot(bookings, manualDate, manualTime, selectedManualOperator.id);
 
     if (alreadyBooked) {
       manualBookingSubmitLockRef.current = false;
@@ -2365,7 +2403,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
         operator_name: selectedManualOperator.name,
         user_id: null,
         created_by: session.user.id,
-        shop_id: SHOP_ID,
+        shop_id: activeShopId,
       },
     ]);
 
@@ -2388,7 +2426,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
       operator_name: selectedManualOperator.name,
       user_id: null,
       created_by: session.user.id,
-      shop_id: SHOP_ID,
+      shop_id: activeShopId,
     };
 
     setBookings((current) => [...current, optimisticBooking]);
@@ -2428,7 +2466,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
       .delete()
       .eq("id", id)
       .eq("user_id", session.user.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     if (error) {
       alert("Non è stato possibile cancellare la prenotazione.");
@@ -2455,7 +2493,7 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
       .from("bookings")
       .delete()
       .eq("id", adminBookingToDelete.id)
-      .eq("shop_id", SHOP_ID);
+      .eq("shop_id", activeShopId);
 
     setAdminDeleteLoading(false);
 
@@ -2480,101 +2518,104 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
   return (
     <div className="app">
       <main className="phone-shell">
-        
-
         {activePage === "home" && (
-  <HomeScreen
-    shopSettings={shopSettings}
-    shopAddressLine={shopAddressLine}
-    isAdmin={isAdmin}
-    session={session}
-    avatarLabel={avatarLabel}
-    showProfileMenu={showProfileMenu}
-    setShowProfileMenu={setShowProfileMenu}
-    setShowPrivacyModal={setShowPrivacyModal}
-    setActivePage={setActivePage}
-    deleteAccountLoading={deleteAccountLoading}
-    openCredentialsModal={openCredentialsModal}
-    logout={logout}
-    deleteAccount={deleteAccount}
-    gallery={gallery}
-    galleryIndex={galleryIndex}
-    goToImage={goToImage}
-    setAdminTab={setAdminTab}
-    loadAdminBookings={loadAdminBookings}
-    servicesLoading={servicesLoading}
-    serviceCategories={serviceCategories}
-    offers={offers}
-  />
-)}
-{activePage === "book" && (
-  <BookingScreen
-    setActivePage={setActivePage}
-    serviceCategories={serviceCategories}
-    servicesLoading={servicesLoading}
-    service={service}
-    setService={setService}
-    selectedService={selectedService}
-    operatorId={operatorId}
-    setOperatorId={setOperatorId}
-    operators={operators}
-    activeOperators={activeOperators}
-    selectedOperator={selectedOperator}
-    date={date}
-    setDate={setDate}
-    time={time}
-    formatLongDate={formatLongDate}
-    setTime={setTime}
-    availableSlots={availableSlots}
-    bookingAvailabilityNotice={bookingAvailabilityNotice}
-    loading={loading}
-    handleSubmit={handleSubmit}
-    offers={offers}
-    />
-)}
+          <HomeScreen
+            shopSettings={shopSettings}
+            shopAddressLine={shopAddressLine}
+            isAdmin={isAdmin}
+            session={session}
+            avatarLabel={avatarLabel}
+            showProfileMenu={showProfileMenu}
+            setShowProfileMenu={setShowProfileMenu}
+            setShowPrivacyModal={setShowPrivacyModal}
+            setActivePage={setActivePage}
+            deleteAccountLoading={deleteAccountLoading}
+            openCredentialsModal={openCredentialsModal}
+            logout={logout}
+            deleteAccount={deleteAccount}
+            gallery={gallery}
+            galleryIndex={galleryIndex}
+            goToImage={goToImage}
+            setAdminTab={setAdminTab}
+            loadAdminBookings={loadAdminBookings}
+            servicesLoading={servicesLoading}
+            serviceCategories={serviceCategories}
+            offers={offers}
+            linkedShops={linkedShops}
+            currentShopId={currentShopId}
+            setCurrentShopId={setCurrentShopId}
+            shopSelectionRequired={shopSelectionRequired}
+          />
+        )}
+
+        {activePage === "book" && (
+          <BookingScreen
+            setActivePage={setActivePage}
+            serviceCategories={serviceCategories}
+            servicesLoading={servicesLoading}
+            service={service}
+            setService={setService}
+            selectedService={selectedService}
+            operatorId={operatorId}
+            setOperatorId={setOperatorId}
+            operators={operators}
+            activeOperators={activeOperators}
+            selectedOperator={selectedOperator}
+            date={date}
+            setDate={setDate}
+            time={time}
+            formatLongDate={formatLongDate}
+            setTime={setTime}
+            availableSlots={availableSlots}
+            bookingAvailabilityNotice={bookingAvailabilityNotice}
+            loading={loading}
+            handleSubmit={handleSubmit}
+            offers={offers}
+          />
+        )}
+
         {activePage === "my-bookings" && (
-  <MyBookingsScreen
-    setActivePage={setActivePage}
-    session={session}
-    myBookings={myBookings}
-    deleteBooking={deleteBooking}
-    formatDateHeader={formatDateHeader}
-    formatLongDate={formatLongDate}
-  />
-)}
+          <MyBookingsScreen
+            setActivePage={setActivePage}
+            session={session}
+            myBookings={myBookings}
+            deleteBooking={deleteBooking}
+            formatDateHeader={formatDateHeader}
+            formatLongDate={formatLongDate}
+          />
+        )}
 
         {activePage === "account" && (
-  <AccountScreen
-    setActivePage={setActivePage}
-    session={session}
-    userProfile={userProfile}
-    isAdmin={isAdmin}
-    logout={logout}
-    handleAuth={handleAuth}
-    authMode={authMode}
-    setAuthMode={setAuthMode}
-    authLoading={authLoading}
-    authFullName={authFullName}
-    setAuthFullName={setAuthFullName}
-    authPhone={authPhone}
-    setAuthPhone={setAuthPhone}
-    authEmail={authEmail}
-    setAuthEmail={setAuthEmail}
-    authPassword={authPassword}
-    setAuthPassword={setAuthPassword}
-    resetPassword={resetPassword}
-  />
-)}
+          <AccountScreen
+            setActivePage={setActivePage}
+            session={session}
+            userProfile={userProfile}
+            isAdmin={isAdmin}
+            logout={logout}
+            handleAuth={handleAuth}
+            authMode={authMode}
+            setAuthMode={setAuthMode}
+            authLoading={authLoading}
+            authFullName={authFullName}
+            setAuthFullName={setAuthFullName}
+            authPhone={authPhone}
+            setAuthPhone={setAuthPhone}
+            authEmail={authEmail}
+            setAuthEmail={setAuthEmail}
+            authPassword={authPassword}
+            setAuthPassword={setAuthPassword}
+            resetPassword={resetPassword}
+          />
+        )}
 
-  {activePage === "admin" && isAdmin && (
-  <AdminScreen
-    setActivePage={setActivePage}
-    adminTab={adminTab}
-    setAdminTab={setAdminTab}
-    loadAdminBookings={loadAdminBookings}
-    loadAvailabilityBlocks={loadAvailabilityBlocks}
-  >
-
+        {activePage === "admin" && isAdmin && (
+          <AdminScreen
+            setActivePage={setActivePage}
+            adminTab={adminTab}
+            setAdminTab={setAdminTab}
+            loadAdminBookings={loadAdminBookings}
+            loadAvailabilityBlocks={loadAvailabilityBlocks}
+          >
             {adminLoading && (
               <div className="empty-card compact">
                 <strong>Caricamento area barbiere</strong>
@@ -2583,186 +2624,186 @@ if (blockedByAvailability || !currentAvailableSlots.includes(time)) {
             )}
 
             {!adminLoading && adminTab === "availability" && (
-  <AdminAvailability
-    closureBlocks={closureBlocks}
-    exceptionalOpeningBlocks={exceptionalOpeningBlocks}
-    availabilityTab={availabilityTab}
-    setAvailabilityTab={setAvailabilityTab}
-    createAvailabilityBlock={createAvailabilityBlock}
-    availabilityMode={availabilityMode}
-    setAvailabilityMode={setAvailabilityMode}
-    availabilitySaving={availabilitySaving}
-    availabilityDate={availabilityDate}
-    setAvailabilityDate={setAvailabilityDate}
-    availabilityWeekday={availabilityWeekday}
-    setAvailabilityWeekday={setAvailabilityWeekday}
-    weekdays={weekdays}
-    slots={slots}
-    availabilityStartTime={availabilityStartTime}
-    setAvailabilityStartTime={setAvailabilityStartTime}
-    availabilityEndTime={availabilityEndTime}
-    setAvailabilityEndTime={setAvailabilityEndTime}
-    availabilityReason={availabilityReason}
-    setAvailabilityReason={setAvailabilityReason}
-    sortedAvailabilityBlocks={sortedAvailabilityBlocks}
-    formatAvailabilityBlockTitle={formatAvailabilityBlockTitle}
-    formatAvailabilityBlockTime={formatAvailabilityBlockTime}
-    getCleanAvailabilityReason={getCleanAvailabilityReason}
-    availabilityDeletingId={availabilityDeletingId}
-    deleteAvailabilityBlock={deleteAvailabilityBlock}
-    createExceptionalOpening={createExceptionalOpening}
-    openingDate={openingDate}
-    setOpeningDate={setOpeningDate}
-    openingSaving={openingSaving}
-    hasExceptionalOpeningForDate={hasExceptionalOpeningForDate}
-    availabilityBlocks={availabilityBlocks}
-    openingStartTime={openingStartTime}
-    setOpeningStartTime={setOpeningStartTime}
-    openingEndTime={openingEndTime}
-    setOpeningEndTime={setOpeningEndTime}
-    openingReason={openingReason}
-    setOpeningReason={setOpeningReason}
-    sortedExceptionalOpeningBlocks={sortedExceptionalOpeningBlocks}
-  />
-)}
+              <AdminAvailability
+                closureBlocks={closureBlocks}
+                exceptionalOpeningBlocks={exceptionalOpeningBlocks}
+                availabilityTab={availabilityTab}
+                setAvailabilityTab={setAvailabilityTab}
+                createAvailabilityBlock={createAvailabilityBlock}
+                availabilityMode={availabilityMode}
+                setAvailabilityMode={setAvailabilityMode}
+                availabilitySaving={availabilitySaving}
+                availabilityDate={availabilityDate}
+                setAvailabilityDate={setAvailabilityDate}
+                availabilityWeekday={availabilityWeekday}
+                setAvailabilityWeekday={setAvailabilityWeekday}
+                weekdays={weekdays}
+                slots={slots}
+                availabilityStartTime={availabilityStartTime}
+                setAvailabilityStartTime={setAvailabilityStartTime}
+                availabilityEndTime={availabilityEndTime}
+                setAvailabilityEndTime={setAvailabilityEndTime}
+                availabilityReason={availabilityReason}
+                setAvailabilityReason={setAvailabilityReason}
+                sortedAvailabilityBlocks={sortedAvailabilityBlocks}
+                formatAvailabilityBlockTitle={formatAvailabilityBlockTitle}
+                formatAvailabilityBlockTime={formatAvailabilityBlockTime}
+                getCleanAvailabilityReason={getCleanAvailabilityReason}
+                availabilityDeletingId={availabilityDeletingId}
+                deleteAvailabilityBlock={deleteAvailabilityBlock}
+                createExceptionalOpening={createExceptionalOpening}
+                openingDate={openingDate}
+                setOpeningDate={setOpeningDate}
+                openingSaving={openingSaving}
+                hasExceptionalOpeningForDate={hasExceptionalOpeningForDate}
+                availabilityBlocks={availabilityBlocks}
+                openingStartTime={openingStartTime}
+                setOpeningStartTime={setOpeningStartTime}
+                openingEndTime={openingEndTime}
+                setOpeningEndTime={setOpeningEndTime}
+                openingReason={openingReason}
+                setOpeningReason={setOpeningReason}
+                sortedExceptionalOpeningBlocks={sortedExceptionalOpeningBlocks}
+              />
+            )}
 
             {!adminLoading && adminTab === "content" && (
-  <AdminContent
-    createAdminService={createAdminService}
-    deleteAdminServiceCategory={deleteAdminServiceCategory}
-    adminContentTab={adminContentTab}
-    setAdminContentTab={setAdminContentTab}
-    loadAdminOperators={loadAdminOperators}
-    adminServices={adminServices}
-    adminServiceCategories={adminServiceCategories}
-    groupedAdminServices={groupedAdminServices}
-    updateAdminServiceField={updateAdminServiceField}
-    saveAdminService={saveAdminService}
-    deleteAdminService={deleteAdminService}
-    adminImages={adminImages}
-    cameraInputRefs={cameraInputRefs}
-    galleryInputRefs={galleryInputRefs}
-    uploadAdminHomeImage={uploadAdminHomeImage}
-    uploadingImageId={uploadingImageId}
-    updateAdminImageField={updateAdminImageField}
-    saveAdminImage={saveAdminImage}
-    createAdminHomeImage={createAdminHomeImage}
-    deleteAdminHomeImage={deleteAdminHomeImage}
-    adminOperators={adminOperators}
-    operatorImageInputRefs={operatorImageInputRefs}
-    uploadAdminOperatorImage={uploadAdminOperatorImage}
-    createAdminOperator={createAdminOperator}
-    newOperatorName={newOperatorName}
-    setNewOperatorName={setNewOperatorName}
-    newOperatorRole={newOperatorRole}
-    setNewOperatorRole={setNewOperatorRole}
-    newOperatorSortOrder={newOperatorSortOrder}
-    setNewOperatorSortOrder={setNewOperatorSortOrder}
-    operatorCreating={operatorCreating}
-    updateAdminOperatorField={updateAdminOperatorField}
-    operatorSavingId={operatorSavingId}
-    saveAdminOperator={saveAdminOperator}
-    operatorDeletingId={operatorDeletingId}
-    deleteAdminOperator={deleteAdminOperator}
-  />
-)}
+              <AdminContent
+                createAdminService={createAdminService}
+                deleteAdminServiceCategory={deleteAdminServiceCategory}
+                adminContentTab={adminContentTab}
+                setAdminContentTab={setAdminContentTab}
+                loadAdminOperators={loadAdminOperators}
+                adminServices={adminServices}
+                adminServiceCategories={adminServiceCategories}
+                groupedAdminServices={groupedAdminServices}
+                updateAdminServiceField={updateAdminServiceField}
+                saveAdminService={saveAdminService}
+                deleteAdminService={deleteAdminService}
+                adminImages={adminImages}
+                cameraInputRefs={cameraInputRefs}
+                galleryInputRefs={galleryInputRefs}
+                uploadAdminHomeImage={uploadAdminHomeImage}
+                uploadingImageId={uploadingImageId}
+                updateAdminImageField={updateAdminImageField}
+                saveAdminImage={saveAdminImage}
+                createAdminHomeImage={createAdminHomeImage}
+                deleteAdminHomeImage={deleteAdminHomeImage}
+                adminOperators={adminOperators}
+                operatorImageInputRefs={operatorImageInputRefs}
+                uploadAdminOperatorImage={uploadAdminOperatorImage}
+                createAdminOperator={createAdminOperator}
+                newOperatorName={newOperatorName}
+                setNewOperatorName={setNewOperatorName}
+                newOperatorRole={newOperatorRole}
+                setNewOperatorRole={setNewOperatorRole}
+                newOperatorSortOrder={newOperatorSortOrder}
+                setNewOperatorSortOrder={setNewOperatorSortOrder}
+                operatorCreating={operatorCreating}
+                updateAdminOperatorField={updateAdminOperatorField}
+                operatorSavingId={operatorSavingId}
+                saveAdminOperator={saveAdminOperator}
+                operatorDeletingId={operatorDeletingId}
+                deleteAdminOperator={deleteAdminOperator}
+              />
+            )}
 
-   {!adminLoading && adminTab === "offers" && (
-  <AdminOffers
-  adminOffers={adminOffers}
-  createAdminOffer={createAdminOffer}
-  updateAdminOfferField={updateAdminOfferField}
-  saveAdminOffer={saveAdminOffer}
-  deleteAdminOffer={deleteAdminOffer}
-  offerSaving={offerSaving}
-  offerDeletingId={offerDeletingId}
-/>
-)}           
+            {!adminLoading && adminTab === "offers" && (
+              <AdminOffers
+                adminOffers={adminOffers}
+                createAdminOffer={createAdminOffer}
+                updateAdminOfferField={updateAdminOfferField}
+                saveAdminOffer={saveAdminOffer}
+                deleteAdminOffer={deleteAdminOffer}
+                offerSaving={offerSaving}
+                offerDeletingId={offerDeletingId}
+              />
+            )}
 
-  {!adminLoading && adminTab === "agenda" && (
-  <AdminAgenda
-    adminAgendaFilter={adminAgendaFilter}
-    setAdminAgendaFilter={setAdminAgendaFilter}
-    loadAdminBookings={loadAdminBookings}
-    groupedAdminBookings={groupedAdminBookings}
-    formatDateHeader={formatDateHeader}
-    setAdminBookingToDelete={setAdminBookingToDelete}
-    filteredAdminBookings={filteredAdminBookings}
-    showManualBookingForm={showManualBookingForm}
-    setShowManualBookingForm={setShowManualBookingForm}
-    manualBookingLoading={manualBookingLoading}
-    createManualBooking={createManualBooking}
-    manualName={manualName}
-    setManualName={setManualName}
-    manualPhone={manualPhone}
-    setManualPhone={setManualPhone}
-    manualService={manualService}
-    setManualService={setManualService}
-    manualOperatorId={manualOperatorId}
-    setManualOperatorId={setManualOperatorId}
-    activeOperators={activeOperators}
-    manualDate={manualDate}
-    setManualDate={setManualDate}
-    manualTime={manualTime}
-    setManualTime={setManualTime}
-    manualAvailableSlots={manualAvailableSlots}
-  />
-)}
-</AdminScreen>
-)}
-      
+            {!adminLoading && adminTab === "agenda" && (
+              <AdminAgenda
+                adminAgendaFilter={adminAgendaFilter}
+                setAdminAgendaFilter={setAdminAgendaFilter}
+                loadAdminBookings={loadAdminBookings}
+                groupedAdminBookings={groupedAdminBookings}
+                formatDateHeader={formatDateHeader}
+                setAdminBookingToDelete={setAdminBookingToDelete}
+                filteredAdminBookings={filteredAdminBookings}
+                showManualBookingForm={showManualBookingForm}
+                setShowManualBookingForm={setShowManualBookingForm}
+                manualBookingLoading={manualBookingLoading}
+                createManualBooking={createManualBooking}
+                manualName={manualName}
+                setManualName={setManualName}
+                manualPhone={manualPhone}
+                setManualPhone={setManualPhone}
+                manualService={manualService}
+                setManualService={setManualService}
+                manualOperatorId={manualOperatorId}
+                setManualOperatorId={setManualOperatorId}
+                activeOperators={activeOperators}
+                manualDate={manualDate}
+                setManualDate={setManualDate}
+                manualTime={manualTime}
+                setManualTime={setManualTime}
+                manualAvailableSlots={manualAvailableSlots}
+              />
+            )}
+          </AdminScreen>
+        )}
 
         {activePage === "info" && (
-  <InfoScreen
-    setActivePage={setActivePage}
-    shopSettings={shopSettings}
-  />
-)}
+          <InfoScreen
+            setActivePage={setActivePage}
+            shopSettings={shopSettings}
+          />
+        )}
       </main>
 
       {showJoinShopPopup && (
-  <JoinShopPopup
-    joinShopLoading={joinShopLoading}
-    confirmJoinShop={confirmJoinShop}
-    cancelJoinShop={cancelJoinShop}
-  />
-)}
+        <JoinShopPopup
+          joinShopLoading={joinShopLoading}
+          confirmJoinShop={confirmJoinShop}
+          cancelJoinShop={cancelJoinShop}
+        />
+      )}
+
       <ConfirmDeleteBookingModal
-  adminBookingToDelete={adminBookingToDelete}
-  adminDeleteLoading={adminDeleteLoading}
-  setAdminBookingToDelete={setAdminBookingToDelete}
-  confirmDeleteAdminBooking={confirmDeleteAdminBooking}
-  formatLongDate={formatLongDate}
-/>
+        adminBookingToDelete={adminBookingToDelete}
+        adminDeleteLoading={adminDeleteLoading}
+        setAdminBookingToDelete={setAdminBookingToDelete}
+        confirmDeleteAdminBooking={confirmDeleteAdminBooking}
+        formatLongDate={formatLongDate}
+      />
 
       {showPrivacyModal && (
-  <PrivacyModal
-    setShowPrivacyModal={setShowPrivacyModal}
-  />
-)}
+        <PrivacyModal
+          setShowPrivacyModal={setShowPrivacyModal}
+        />
+      )}
 
       {showCredentialsModal && (
-  <CredentialsModal
-    session={session}
-    newFullName={newFullName}
-    setNewFullName={setNewFullName}
-    newPhone={newPhone}
-    setNewPhone={setNewPhone}
-    newEmail={newEmail}
-    setNewEmail={setNewEmail}
-    newPassword={newPassword}
-    setNewPassword={setNewPassword}
-    credentialsLoading={credentialsLoading}
-    updateCredentials={updateCredentials}
-    setShowCredentialsModal={setShowCredentialsModal}
-  />
-)}
+        <CredentialsModal
+          session={session}
+          newFullName={newFullName}
+          setNewFullName={setNewFullName}
+          newPhone={newPhone}
+          setNewPhone={setNewPhone}
+          newEmail={newEmail}
+          setNewEmail={setNewEmail}
+          newPassword={newPassword}
+          setNewPassword={setNewPassword}
+          credentialsLoading={credentialsLoading}
+          updateCredentials={updateCredentials}
+          setShowCredentialsModal={setShowCredentialsModal}
+        />
+      )}
 
       <BottomNav
-  activePage={activePage}
-  setActivePage={setActivePage}
-  setShowProfileMenu={setShowProfileMenu}
-/>
+        activePage={activePage}
+        setActivePage={setActivePage}
+        setShowProfileMenu={setShowProfileMenu}
+      />
     </div>
   );
 }

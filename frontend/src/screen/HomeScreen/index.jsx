@@ -26,6 +26,10 @@ function HomeScreen({
   servicesLoading,
   serviceCategories,
   offers,
+  linkedShops,
+  currentShopId,
+  setCurrentShopId,
+  shopSelectionRequired,
 }) {
   return (
     <section className="screen">
@@ -55,6 +59,40 @@ function HomeScreen({
         shopAddressLine={shopAddressLine}
         shopSettings={shopSettings}
       />
+      {shopSelectionRequired && linkedShops.length > 1 && (
+  <div className="shop-switcher-card">
+    <div className="shop-switcher-header">
+      <strong>I tuoi saloni</strong>
+      <span>Scegli dove prenotare</span>
+    </div>
+
+    <div className="shop-switcher-list">
+      {linkedShops.map((shop) => {
+        const isActive = currentShopId === shop.id;
+
+        return (
+          <button
+            key={shop.id}
+            type="button"
+            className={isActive ? "shop-switch-btn active" : "shop-switch-btn"}
+            onClick={() => {
+  if (shop.id !== currentShopId) {
+    setCurrentShopId(shop.id);
+  }
+}}
+          >
+            <strong>{shop.name || "Barber Shop"}</strong>
+
+            {shop.slug && (
+              <span>@{shop.slug}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+)}
+      
       {offers?.length > 0 && (
   <div className="offer-banner home-offer-banner">
     <span className="offer-banner-label">Offerta attiva</span>

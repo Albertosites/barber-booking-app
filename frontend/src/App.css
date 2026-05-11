@@ -2185,3 +2185,51 @@ select:focus {
   font-size: 14px;
   font-weight: 900;
 }
+.shop-switcher-card {
+  border-radius: 24px;
+  padding: 18px;
+  margin: 16px 0 18px;
+  background: #262323;
+  color: white;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16);
+}
+
+.shop-switcher-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.shop-switcher-header span {
+  font-size: 0.78rem;
+  opacity: 0.72;
+}
+
+.shop-switcher-list {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-switch-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border-radius: 18px;
+  padding: 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shop-switch-btn span {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.shop-switch-btn.active {
+  background: #d8264c;
+  border-color: #d8264c;
+}
