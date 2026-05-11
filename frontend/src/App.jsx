@@ -2194,6 +2194,9 @@ return validShops;
 
   async function logout() {
     await supabase.auth.signOut();
+    localStorage.removeItem("barberbooking_current_shop_id");
+    setCurrentShopId("");
+    setLinkedShops([]);
     setIsAdmin(false);
     setUserProfile(null);
     setMyBookings([]);
@@ -2783,7 +2786,7 @@ return validShops;
           </AdminScreen>
         )}
 
-        {activePage === "info" && (
+        {session && activePage === "info" && (
           <InfoScreen
             setActivePage={setActivePage}
             shopSettings={shopSettings}
