@@ -2250,3 +2250,93 @@ select:focus {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+.shop-select-screen {
+  min-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  padding-bottom: 28px;
+}
+
+.shop-select-hero {
+  background: linear-gradient(180deg, #262323 0%, #171313 100%);
+  color: white;
+  border-radius: 30px;
+  padding: 28px 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+.shop-select-hero span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #d8264c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shop-select-hero h1 {
+  margin: 18px 0 8px;
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.shop-select-hero p {
+  margin: 0;
+  opacity: 0.74;
+  line-height: 1.5;
+}
+
+.shop-select-list {
+  display: grid;
+  gap: 14px;
+}
+
+.shop-select-card {
+  border: 1px solid rgba(38, 35, 35, 0.08);
+  background: white;
+  border-radius: 24px;
+  padding: 18px;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  box-shadow: 0 12px 30px rgba(38, 35, 35, 0.08);
+}
+
+.shop-select-card strong {
+  display: block;
+  color: #262323;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.shop-select-card span {
+  color: rgba(38, 35, 35, 0.54);
+  font-size: 0.82rem;
+}
+
+.shop-select-card small {
+  background: #262323;
+  color: white;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.shop-select-card.active {
+  border-color: #d8264c;
+  box-shadow: 0 18px 44px rgba(216, 38, 76, 0.18);
+}
+
+.shop-select-card.active small {
+  background: #d8264c;
+}
