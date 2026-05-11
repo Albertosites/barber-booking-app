@@ -867,60 +867,60 @@ function App() {
     setIsAdmin(data?.role === "admin");
   }
 
-  async function loadLinkedShops(userId) {
-    const { data, error } = await supabase
-      .from("shop_members")
-      .select(`
-        role,
-        shop_id,
-        shops (
-          id,
-          name,
-          slug,
-          active
-        )
-      `)
-      .eq("user_id", userId);
+ async function loadLinkedShops(userId) {
+  const { data, error } = await supabase
+    .from("shop_members")
+    .select(`
+      role,
+      shop_id,
+      shops (
+        id,
+        name,
+        slug,
+        active
+      )
+    `)
+    .eq("user_id", userId);
 
-    if (error) {
-      console.error(error);
-      return [];
-    }
+  if (error) {
+    console.error(error);
+    return [];
+  }
 
-    const validShops = (data || [])
-      .map((item) => ({
-        role: item.role,
-        ...(item.shops || {}),
-      }))
-      .filter((shop) => shop.id && shop.active !== false);
+  const validShops = (data || [])
+    .map((item) => ({
+      role: item.role,
+      ...(item.shops || {}),
+    }))
+    .filter((shop) => shop.id && shop.active !== false);
 
-    setLinkedShops(validShops);
-console.log("LINKED SHOPS DEBUG:", validShops);
+  setLinkedShops(validShops);
+  console.log("LINKED SHOPS DEBUG:", validShops);
 
-if (validShops.length === 0) {
+  if (validShops.length === 0) {
+    setCurrentShopId("");
+    setShopGateReady(true);
+    return validShops;
+  }
+
+  if (validShops.length === 1) {
+    setCurrentShopId(validShops[0].id);
+    setShopGateReady(true);
+    return validShops;
+  }
+
   const savedShopId = localStorage.getItem("barberbooking_current_shop_id");
-const savedShopIsValid = validShops.some((shop) => shop.id === savedShopId);
+  const savedShopIsValid = validShops.some((shop) => shop.id === savedShopId);
 
-if (savedShopIsValid) {
-  setCurrentShopId(savedShopId);
-} else {
-  setCurrentShopId("");
-}
+  if (savedShopIsValid) {
+    setCurrentShopId(savedShopId);
+  } else {
+    setCurrentShopId("");
+  }
 
-setShopGateReady(true);
-return validShops;
-}
-
-if (validShops.length === 1) {
-  setCurrentShopId(validShops[0].id);
   setShopGateReady(true);
   return validShops;
 }
-
-setCurrentShopId("");
-setShopGateReady(true);
-return validShops;
-  }
 
   async function deleteOldBookings() {
     const { error } = await supabase.rpc("delete_old_bookings");
