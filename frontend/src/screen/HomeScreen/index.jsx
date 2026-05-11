@@ -59,47 +59,7 @@ function HomeScreen({
         shopAddressLine={shopAddressLine}
         shopSettings={shopSettings}
       />
-      {linkedShops?.length > 1 && (
-  <div className="shop-switcher-card">
-    <div className="shop-switcher-header">
-      <strong>Salone attivo</strong>
-      <span>Scegli dove prenotare</span>
-    </div>
-
-    <div className="shop-switcher-list">
-      {linkedShops.map((shop) => {
-        const isActive = currentShopId === shop.id;
-
-        return (
-          <button
-            key={shop.id}
-            type="button"
-            className={isActive ? "shop-switch-btn active" : "shop-switch-btn"}
-            onClick={() => {
-  if (shop.id !== currentShopId) {
-    setCurrentShopId(shop.id);
-  }
-}}
-          >
-            <div className="shop-switch-title-row">
-  <strong>{shop.name || "Barber Shop"}</strong>
-
-  {isActive && (
-    <span className="shop-active-badge">
-      Attivo
-    </span>
-  )}
-</div>
-
-            {shop.slug && (
-              <span>@{shop.slug}</span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-)}
+    
       
       {offers?.length > 0 && (
   <div className="offer-banner home-offer-banner">

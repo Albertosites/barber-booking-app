@@ -1,3 +1,4 @@
+import ShopSelectScreen from "./screen/ShopSelectScreen";
 import AdminOffers from "./screen/AdminScreen/AdminOffers";
 import AdminContent from "./screen/AdminScreen/AdminContent";
 import AdminAvailability from "./screen/AdminScreen/AdminAvailability";
@@ -351,7 +352,6 @@ function App() {
   return localStorage.getItem("barberbooking_current_shop_id") || SHOP_ID;
 });
   const [linkedShops, setLinkedShops] = useState([]);
-  const [shopSelectionRequired, setShopSelectionRequired] = useState(false);
   const activeShopId = currentShopId || SHOP_ID;
 
   const [serviceCategories, setServiceCategories] = useState([]);
@@ -894,26 +894,22 @@ function App() {
     setLinkedShops(validShops);
 console.log("LINKED SHOPS DEBUG:", validShops);
 
-   
-
 if (validShops.length === 0) {
-  setShopSelectionRequired(false);
   return validShops;
 }
 
 if (validShops.length === 1) {
   setCurrentShopId(validShops[0].id);
-  setShopSelectionRequired(false);
   return validShops;
 }
 
-const currentStillValid = validShops.some((shop) => shop.id === activeShopId);
+const currentStillValid = validShops.some(
+  (shop) => shop.id === currentShopId
+);
 
 if (!currentStillValid) {
-  setCurrentShopId(validShops[0].id);
+  setCurrentShopId(null);
 }
-
-setShopSelectionRequired(true);
 
 return validShops;
   }
@@ -2528,34 +2524,38 @@ return validShops;
     <div className="app">
       <main className="phone-shell">
         {activePage === "home" && (
-          <HomeScreen
-            shopSettings={shopSettings}
-            shopAddressLine={shopAddressLine}
-            isAdmin={isAdmin}
-            session={session}
-            avatarLabel={avatarLabel}
-            showProfileMenu={showProfileMenu}
-            setShowProfileMenu={setShowProfileMenu}
-            setShowPrivacyModal={setShowPrivacyModal}
-            setActivePage={setActivePage}
-            deleteAccountLoading={deleteAccountLoading}
-            openCredentialsModal={openCredentialsModal}
-            logout={logout}
-            deleteAccount={deleteAccount}
-            gallery={gallery}
-            galleryIndex={galleryIndex}
-            goToImage={goToImage}
-            setAdminTab={setAdminTab}
-            loadAdminBookings={loadAdminBookings}
-            servicesLoading={servicesLoading}
-            serviceCategories={serviceCategories}
-            offers={offers}
-            linkedShops={linkedShops}
-            currentShopId={currentShopId}
-            setCurrentShopId={setCurrentShopId}
-            shopSelectionRequired={shopSelectionRequired}
-          />
-        )}
+  linkedShops.length > 1 && !currentShopId ? (
+    <ShopSelectScreen
+      linkedShops={linkedShops}
+      currentShopId={currentShopId}
+      setCurrentShopId={setCurrentShopId}
+    />
+  ) : (
+    <HomeScreen
+      shopSettings={shopSettings}
+      shopAddressLine={shopAddressLine}
+      isAdmin={isAdmin}
+      session={session}
+      avatarLabel={avatarLabel}
+      showProfileMenu={showProfileMenu}
+      setShowProfileMenu={setShowProfileMenu}
+      setShowPrivacyModal={setShowPrivacyModal}
+      setActivePage={setActivePage}
+      deleteAccountLoading={deleteAccountLoading}
+      openCredentialsModal={openCredentialsModal}
+      logout={logout}
+      deleteAccount={deleteAccount}
+      gallery={gallery}
+      galleryIndex={galleryIndex}
+      goToImage={goToImage}
+      setAdminTab={setAdminTab}
+      loadAdminBookings={loadAdminBookings}
+      servicesLoading={servicesLoading}
+      serviceCategories={serviceCategories}
+      offers={offers}
+    />
+  )
+)}
 
         {activePage === "book" && (
           <BookingScreen
