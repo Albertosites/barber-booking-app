@@ -2233,3 +2233,20 @@ select:focus {
   background: #d8264c;
   border-color: #d8264c;
 }
+
+.shop-switch-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shop-active-badge {
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

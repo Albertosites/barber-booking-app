@@ -62,7 +62,7 @@ function HomeScreen({
       {shopSelectionRequired && linkedShops.length > 1 && (
   <div className="shop-switcher-card">
     <div className="shop-switcher-header">
-      <strong>I tuoi saloni</strong>
+      <strong>Salone attivo</strong>
       <span>Scegli dove prenotare</span>
     </div>
 
@@ -81,7 +81,15 @@ function HomeScreen({
   }
 }}
           >
-            <strong>{shop.name || "Barber Shop"}</strong>
+            <div className="shop-switch-title-row">
+  <strong>{shop.name || "Barber Shop"}</strong>
+
+  {isActive && (
+    <span className="shop-active-badge">
+      Attivo
+    </span>
+  )}
+</div>
 
             {shop.slug && (
               <span>@{shop.slug}</span>
