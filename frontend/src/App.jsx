@@ -355,11 +355,6 @@ function App() {
   const [shopChoiceCompleted, setShopChoiceCompleted] = useState(false);
   const [linkedShops, setLinkedShops] = useState([]);
   const activeShopId = currentShopId || SHOP_ID;
-  const canEnterShop =
-  Boolean(session) &&
-  shopGateReady &&
-  Boolean(currentShopId) &&
-  (linkedShops.length <= 1 || shopChoiceCompleted);
 
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -369,6 +364,11 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState("agenda");
   const [adminContentTab, setAdminContentTab] = useState("services");
+  const canEnterShop =
+  Boolean(session) &&
+  shopGateReady &&
+  Boolean(currentShopId) &&
+  (linkedShops.length <= 1 || shopChoiceCompleted);
   const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
