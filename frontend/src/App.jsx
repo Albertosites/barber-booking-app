@@ -39,6 +39,8 @@ const weekdays = [
   { value: 6, label: "Sabato" },
 ];
 
+
+
 const fallbackGallery = [
   {
     title: "Tagli uomo",
@@ -351,6 +353,7 @@ function App() {
   const [currentShopId, setCurrentShopId] = useState(() => {
   return localStorage.getItem("barberbooking_current_shop_id") || "";
 });
+  const [shopGateReady, setShopGateReady] = useState(false);
   const [linkedShops, setLinkedShops] = useState([]);
   const activeShopId = currentShopId || SHOP_ID;
 
@@ -895,22 +898,19 @@ function App() {
 console.log("LINKED SHOPS DEBUG:", validShops);
 
 if (validShops.length === 0) {
+  setCurrentShopId("");
+  setShopGateReady(true);
   return validShops;
 }
 
 if (validShops.length === 1) {
   setCurrentShopId(validShops[0].id);
+  setShopGateReady(true);
   return validShops;
 }
 
-const currentStillValid = validShops.some(
-  (shop) => shop.id === currentShopId
-);
-
-if (!currentStillValid) {
-  setCurrentShopId(null);
-}
-
+setCurrentShopId("");
+setShopGateReady(true);
 return validShops;
   }
 
@@ -2532,7 +2532,26 @@ await loadLinkedShops(data.user.id);
   return (
     <div className="app">
       <main className="phone-shell">
-       {!session && (
+       
+        {session && !shopGateReady && (
+  <section className="screen shop-select-screen">
+    <div className="shop-select-hero">
+      <span>BarberBooking</span>
+      <h1>Caricamento saloni</h1>
+      <p>Stiamo preparando la tua esperienza.</p>
+    </div>
+  </section>
+)}
+
+{session && shopGateReady && linkedShops.length > 1 && !currentShopId && (
+  <ShopSelectScreen
+    linkedShops={linkedShops}
+    currentShopId={currentShopId}
+    setCurrentShopId={setCurrentShopId}
+  />
+)}
+        
+        {!session && (
   <AccountScreen
     setActivePage={setActivePage}
     session={session}
@@ -2554,7 +2573,7 @@ await loadLinkedShops(data.user.id);
     resetPassword={resetPassword}
   />
 )}
-        {session && activePage === "home" && (
+        {session && shopGateReady && currentShopId && activePage === "home" && (
   linkedShops.length > 1 && !currentShopId ? (
     <ShopSelectScreen
       linkedShops={linkedShops}
@@ -2588,7 +2607,7 @@ await loadLinkedShops(data.user.id);
   )
 )}
 
-        {session && activePage === "book" && (
+        {session && shopGateReady && currentShopId && activePage === "book" && (
           <BookingScreen
             setActivePage={setActivePage}
             serviceCategories={serviceCategories}
@@ -2614,7 +2633,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {session && activePage === "my-bookings" && (
+        {session && shopGateReady && currentShopId && activePage === "my-bookings" && (
           <MyBookingsScreen
             setActivePage={setActivePage}
             session={session}
@@ -2625,7 +2644,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {session && activePage === "account" && (
+        {session && shopGateReady && currentShopId && activePage === "account" && (
           <AccountScreen
             setActivePage={setActivePage}
             session={session}
@@ -2648,7 +2667,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {activePage === "admin" && isAdmin && (
+        {session && shopGateReady && currentShopId && activePage === "admin" && isAdmin && (
           <AdminScreen
             setActivePage={setActivePage}
             adminTab={adminTab}
@@ -2792,7 +2811,7 @@ await loadLinkedShops(data.user.id);
           </AdminScreen>
         )}
 
-        {session && activePage === "info" && (
+        {session && shopGateReady && currentShopId && activePage === "info" && (
           <InfoScreen
             setActivePage={setActivePage}
             shopSettings={shopSettings}
@@ -2839,11 +2858,13 @@ await loadLinkedShops(data.user.id);
         />
       )}
 
-      <BottomNav
-        activePage={activePage}
-        setActivePage={setActivePage}
-        setShowProfileMenu={setShowProfileMenu}
-      />
+      {session && shopGateReady && currentShopId && (
+  <BottomNav
+    activePage={activePage}
+    setActivePage={setActivePage}
+    setShowProfileMenu={setShowProfileMenu}
+  />
+)}
     </div>
   );
 }
