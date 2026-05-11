@@ -2541,6 +2541,21 @@ await loadLinkedShops(data.user.id);
     alert("Prenotazione eliminata.");
   }
 
+  function selectShop(shopId) {
+  setShopDataLoading(true);
+  setServiceCategories([]);
+  setOffers([]);
+  setGallery(fallbackGallery);
+  setGalleryIndex(0);
+  setBookings([]);
+  setMyBookings([]);
+  setOperators([]);
+  setAvailabilityBlocks([]);
+
+  setCurrentShopId(shopId);
+  setShopChoiceCompleted(true);
+}
+
   return (
     <div className="app">
       <main className="phone-shell">
@@ -2587,37 +2602,29 @@ await loadLinkedShops(data.user.id);
   />
 )}
   {selectedShopReady && activePage === "home" && (
-  linkedShops.length > 1 && !currentShopId ? (
-    <ShopSelectScreen
-      linkedShops={linkedShops}
-      currentShopId={currentShopId}
-      setCurrentShopId={setCurrentShopId}
-    />
-  ) : (
-    <HomeScreen
-      shopSettings={shopSettings}
-      shopAddressLine={shopAddressLine}
-      isAdmin={isAdmin}
-      session={session}
-      avatarLabel={avatarLabel}
-      showProfileMenu={showProfileMenu}
-      setShowProfileMenu={setShowProfileMenu}
-      setShowPrivacyModal={setShowPrivacyModal}
-      setActivePage={setActivePage}
-      deleteAccountLoading={deleteAccountLoading}
-      openCredentialsModal={openCredentialsModal}
-      logout={logout}
-      deleteAccount={deleteAccount}
-      gallery={gallery}
-      galleryIndex={galleryIndex}
-      goToImage={goToImage}
-      setAdminTab={setAdminTab}
-      loadAdminBookings={loadAdminBookings}
-      servicesLoading={servicesLoading}
-      serviceCategories={serviceCategories}
-      offers={offers}
-    />
-  )
+  <HomeScreen
+    shopSettings={shopSettings}
+    shopAddressLine={shopAddressLine}
+    isAdmin={isAdmin}
+    session={session}
+    avatarLabel={avatarLabel}
+    showProfileMenu={showProfileMenu}
+    setShowProfileMenu={setShowProfileMenu}
+    setShowPrivacyModal={setShowPrivacyModal}
+    setActivePage={setActivePage}
+    deleteAccountLoading={deleteAccountLoading}
+    openCredentialsModal={openCredentialsModal}
+    logout={logout}
+    deleteAccount={deleteAccount}
+    gallery={gallery}
+    galleryIndex={galleryIndex}
+    goToImage={goToImage}
+    setAdminTab={setAdminTab}
+    loadAdminBookings={loadAdminBookings}
+    servicesLoading={servicesLoading}
+    serviceCategories={serviceCategories}
+    offers={offers}
+  />
 )}
 
            {selectedShopReady && activePage === "book" && (
