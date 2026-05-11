@@ -59,7 +59,7 @@ function HomeScreen({
         shopAddressLine={shopAddressLine}
         shopSettings={shopSettings}
       />
-      {shopSelectionRequired && linkedShops.length > 1 && (
+      {linkedShops?.length > 1 && (
   <div className="shop-switcher-card">
     <div className="shop-switcher-header">
       <strong>Salone attivo</strong>
