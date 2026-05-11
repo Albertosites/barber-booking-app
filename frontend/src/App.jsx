@@ -903,17 +903,10 @@ function App() {
     return validShops;
   }
 
-  const savedShopId = localStorage.getItem("barberbooking_current_shop_id");
-  const savedShopIsValid = validShops.some((shop) => shop.id === savedShopId);
-
-  if (savedShopIsValid) {
-    setCurrentShopId(savedShopId);
-  } else {
-    setCurrentShopId("");
-  }
-
-  setShopGateReady(true);
-  return validShops;
+  localStorage.removeItem("barberbooking_current_shop_id");
+setCurrentShopId("");
+setShopGateReady(true);
+return validShops;
 }
 
   async function deleteOldBookings() {
