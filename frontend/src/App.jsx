@@ -892,8 +892,9 @@ function App() {
       .filter((shop) => shop.id && shop.active !== false);
 
     setLinkedShops(validShops);
+console.log("LINKED SHOPS DEBUG:", validShops);
 
-   setLinkedShops(validShops);
+   
 
 if (validShops.length === 0) {
   setShopSelectionRequired(false);
