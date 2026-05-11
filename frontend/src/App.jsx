@@ -893,20 +893,28 @@ function App() {
 
     setLinkedShops(validShops);
 
-    if (validShops.length === 1) {
-  setCurrentShopId(validShops[0].id);
-  setShopSelectionRequired(false);
-  return validShops;
-}
+   setLinkedShops(validShops);
 
 if (validShops.length === 0) {
   setShopSelectionRequired(false);
   return validShops;
 }
 
+if (validShops.length === 1) {
+  setCurrentShopId(validShops[0].id);
+  setShopSelectionRequired(false);
+  return validShops;
+}
+
+const currentStillValid = validShops.some((shop) => shop.id === activeShopId);
+
+if (!currentStillValid) {
+  setCurrentShopId(validShops[0].id);
+}
+
 setShopSelectionRequired(true);
 
-    return validShops;
+return validShops;
   }
 
   async function deleteOldBookings() {
