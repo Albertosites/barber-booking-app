@@ -358,7 +358,7 @@ function App() {
 
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
-
+  const [shopDataLoading, setShopDataLoading] = useState(false);
   const [session, setSession] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -371,6 +371,7 @@ function App() {
   (linkedShops.length <= 1 || shopChoiceCompleted);
   const selectedShopReady =
   canEnterShop &&
+  !shopDataLoading &&
   serviceCategories.length > 0;
   const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
@@ -1672,7 +1673,7 @@ return validShops;
 
   async function loadServices() {
     setServicesLoading(true);
-
+    setShopDataLoading(true);
     const { data, error } = await supabase
       .from("services")
       .select("*")
@@ -1681,7 +1682,7 @@ return validShops;
       .order("sort_order", { ascending: true });
 
     setServicesLoading(false);
-
+    setShopDataLoading(false);
     if (error) {
       alert("Errore nel caricamento dei servizi");
       console.error(error);
