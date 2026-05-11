@@ -898,9 +898,17 @@ function App() {
 console.log("LINKED SHOPS DEBUG:", validShops);
 
 if (validShops.length === 0) {
+  const savedShopId = localStorage.getItem("barberbooking_current_shop_id");
+const savedShopIsValid = validShops.some((shop) => shop.id === savedShopId);
+
+if (savedShopIsValid) {
+  setCurrentShopId(savedShopId);
+} else {
   setCurrentShopId("");
-  setShopGateReady(true);
-  return validShops;
+}
+
+setShopGateReady(true);
+return validShops;
 }
 
 if (validShops.length === 1) {
