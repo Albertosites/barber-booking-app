@@ -350,9 +350,7 @@ function App() {
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
-  const [currentShopId, setCurrentShopId] = useState(() => {
-  return localStorage.getItem("barberbooking_current_shop_id") || "";
-});
+  const [currentShopId, setCurrentShopId] = useState("");
   const [shopGateReady, setShopGateReady] = useState(false);
   const [linkedShops, setLinkedShops] = useState([]);
   const activeShopId = currentShopId || SHOP_ID;
@@ -616,11 +614,7 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-  if (currentShopId) {
-    localStorage.setItem("barberbooking_current_shop_id", currentShopId);
-  }
-}, [currentShopId]);
+  
   
   useEffect(() => {
   loadShopSettings();
