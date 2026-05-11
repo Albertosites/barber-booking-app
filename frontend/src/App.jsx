@@ -349,7 +349,7 @@ function App() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
   const [currentShopId, setCurrentShopId] = useState(() => {
-  return localStorage.getItem("barberbooking_current_shop_id") || SHOP_ID;
+  return localStorage.getItem("barberbooking_current_shop_id") || "";
 });
   const [linkedShops, setLinkedShops] = useState([]);
   const activeShopId = currentShopId || SHOP_ID;
@@ -2523,7 +2523,29 @@ return validShops;
   return (
     <div className="app">
       <main className="phone-shell">
-        {activePage === "home" && (
+       {!session && (
+  <AccountScreen
+    setActivePage={setActivePage}
+    session={session}
+    userProfile={userProfile}
+    isAdmin={isAdmin}
+    logout={logout}
+    handleAuth={handleAuth}
+    authMode={authMode}
+    setAuthMode={setAuthMode}
+    authLoading={authLoading}
+    authFullName={authFullName}
+    setAuthFullName={setAuthFullName}
+    authPhone={authPhone}
+    setAuthPhone={setAuthPhone}
+    authEmail={authEmail}
+    setAuthEmail={setAuthEmail}
+    authPassword={authPassword}
+    setAuthPassword={setAuthPassword}
+    resetPassword={resetPassword}
+  />
+)}
+        {session && activePage === "home" && (
   linkedShops.length > 1 && !currentShopId ? (
     <ShopSelectScreen
       linkedShops={linkedShops}
@@ -2557,7 +2579,7 @@ return validShops;
   )
 )}
 
-        {activePage === "book" && (
+        {session && activePage === "book" && (
           <BookingScreen
             setActivePage={setActivePage}
             serviceCategories={serviceCategories}
@@ -2583,7 +2605,7 @@ return validShops;
           />
         )}
 
-        {activePage === "my-bookings" && (
+        {session && activePage === "my-bookings" && (
           <MyBookingsScreen
             setActivePage={setActivePage}
             session={session}
@@ -2594,7 +2616,7 @@ return validShops;
           />
         )}
 
-        {activePage === "account" && (
+        {session && activePage === "account" && (
           <AccountScreen
             setActivePage={setActivePage}
             session={session}
