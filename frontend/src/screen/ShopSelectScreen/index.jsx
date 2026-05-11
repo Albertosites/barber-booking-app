@@ -22,7 +22,10 @@ function ShopSelectScreen({
               key={shop.id}
               type="button"
               className={isActive ? "shop-select-card active" : "shop-select-card"}
-              onClick={() => setCurrentShopId(shop.id)}
+              onClick={() => {
+  localStorage.setItem("barberbooking_current_shop_id", shop.id);
+  setCurrentShopId(shop.id);
+}}
             >
               <div>
                 <strong>{shop.name || "Barber Shop"}</strong>
