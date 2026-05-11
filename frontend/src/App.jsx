@@ -359,6 +359,7 @@ function App() {
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [shopDataLoading, setShopDataLoading] = useState(false);
+  const [loadedShopId, setLoadedShopId] = useState("");
   const [session, setSession] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -372,6 +373,7 @@ function App() {
   const selectedShopReady =
   canEnterShop &&
   !shopDataLoading &&
+  loadedShopId === activeShopId &&
   serviceCategories.length > 0;
   const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
@@ -1672,6 +1674,8 @@ return validShops;
   }
 
   async function loadServices() {
+    const requestedShopId = activeShopId;
+    
     setServicesLoading(true);
     setShopDataLoading(true);
     const { data, error } = await supabase
@@ -1717,6 +1721,7 @@ return validShops;
     });
 
     setServiceCategories(groupedServices);
+    setLoadedShopId(requestedShopId);
   }
 
   async function loadAvailabilityBlocks() {
@@ -2543,6 +2548,7 @@ await loadLinkedShops(data.user.id);
 
   function selectShop(shopId) {
   setShopDataLoading(true);
+  setLoadedShopId("");
   setServiceCategories([]);
   setOffers([]);
   setGallery(fallbackGallery);
@@ -2574,7 +2580,7 @@ await loadLinkedShops(data.user.id);
   <ShopSelectScreen
     linkedShops={linkedShops}
     currentShopId={currentShopId}
-    setCurrentShopId={setCurrentShopId}
+    setCurrentShopId={selectShop}
     setShopChoiceCompleted={setShopChoiceCompleted}
   />
 )}
