@@ -369,6 +369,9 @@ function App() {
   shopGateReady &&
   Boolean(currentShopId) &&
   (linkedShops.length <= 1 || shopChoiceCompleted);
+  const selectedShopReady =
+  canEnterShop &&
+  serviceCategories.length > 0;
   const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
@@ -2582,7 +2585,7 @@ await loadLinkedShops(data.user.id);
     resetPassword={resetPassword}
   />
 )}
-  {canEnterShop && activePage === "home" && (
+  {selectedShopReady && activePage === "home" && (
   linkedShops.length > 1 && !currentShopId ? (
     <ShopSelectScreen
       linkedShops={linkedShops}
@@ -2616,7 +2619,7 @@ await loadLinkedShops(data.user.id);
   )
 )}
 
-           {canEnterShop && activePage === "book" && (
+           {selectedShopReady && activePage === "book" && (
         <BookingScreen
             setActivePage={setActivePage}
             serviceCategories={serviceCategories}
@@ -2642,7 +2645,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {canEnterShop && activePage === "my-bookings" && (
+        {selectedShopReady && activePage === "my-bookings" && (
           <MyBookingsScreen
             setActivePage={setActivePage}
             session={session}
@@ -2820,7 +2823,7 @@ await loadLinkedShops(data.user.id);
           </AdminScreen>
         )}
 
-        {canEnterShop && activePage === "info" && (
+        {selectedShopReady && activePage === "info" && (
           <InfoScreen
             setActivePage={setActivePage}
             shopSettings={shopSettings}
