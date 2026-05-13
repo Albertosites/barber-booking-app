@@ -2357,26 +2357,19 @@ select:focus {
 .shop-remove-icon {
   width: 30px;
   height: 30px;
-
   min-width: 30px;
-
   border: none;
   border-radius: 999px;
-
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.55);
-
+  background: rgba(216, 38, 76, 0.1);
+  color: #d8264c;
   display: flex;
   align-items: center;
   justify-content: center;
-
   cursor: pointer;
-
   transition: 0.2s ease;
 }
 
 .shop-remove-icon:hover {
-  background: rgba(255,255,255,0.14);
-  color: #ff4d4d;
-  transform: scale(1.08);
+  background: rgba(216, 38, 76, 0.18);
+  transform: scale(1.06);
 }

@@ -7,6 +7,11 @@ function ShopSelectScreen({
   setShopChoiceCompleted,
 }) {
 async function handleLeaveShop(shop) {
+  if (shop.role === "admin") {
+  alert("Sei admin di questo salone. Non puoi rimuoverlo dal tuo account.");
+  return;
+}
+  
   const firstConfirm = window.confirm(
     `Vuoi davvero rimuovere "${shop.name}" dal tuo account?`
   );
