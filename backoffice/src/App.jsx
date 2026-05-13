@@ -119,37 +119,37 @@ function App() {
   }
 
   async function handleAddAdmin(shopId) {
-  const email = (adminEmails[shopId] || "").trim();
+    const emailValue = (adminEmails[shopId] || "").trim();
 
-  if (!email) {
-    alert("Inserisci una email.");
-    return;
+    if (!emailValue) {
+      alert("Inserisci una email.");
+      return;
+    }
+
+    setAddingAdminFor(shopId);
+
+    const { error } = await supabase.rpc("add_shop_admin_by_email", {
+      p_shop_id: shopId,
+      p_email: emailValue,
+    });
+
+    setAddingAdminFor(null);
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile aggiungere l'admin.");
+      return;
+    }
+
+    setAdminEmails((prev) => ({
+      ...prev,
+      [shopId]: "",
+    }));
+
+    await loadShopsOverview();
+
+    alert("Admin aggiunto correttamente.");
   }
-
-  setAddingAdminFor(shopId);
-
-  const { error } = await supabase.rpc("add_shop_admin_by_email", {
-    p_shop_id: shopId,
-    p_email: email,
-  });
-
-  setAddingAdminFor(null);
-
-  if (error) {
-    console.error(error);
-    alert("Non è stato possibile aggiungere l'admin.");
-    return;
-  }
-
-  setAdminEmails((prev) => ({
-    ...prev,
-    [shopId]: "",
-  }));
-
-  await loadShopsOverview();
-
-  alert("Admin aggiunto correttamente.");
-}
 
   async function handleCreateShop(e) {
     e.preventDefault();
@@ -426,69 +426,47 @@ function App() {
 
           {shopsLoading && <p>Caricamento shop...</p>}
 
-          {!shopsLoading && shops.length === 0 && (
-            <p>Nessuno shop trovato.</p>
-          )}
+          {!shopsLoading && shops.length === 0 && <p>Nessuno shop trovato.</p>}
 
           {!shopsLoading && shops.length > 0 && (
             <div className="shop-list">
               {shops.map((shop) => (
                 <div className="shop-row" key={shop.shop_id}>
-                  <div>
+                  <div className="shop-main">
                     <strong>{shop.name}</strong>
                     <p>
-                      <code>/register/{shop.slug}</code>
+                      URL registrazione: <code>/register/{shop.slug}</code>
                     </p>
                     <p>
                       ID: <code>{shop.shop_id}</code>
                     </p>
                   </div>
 
-                  <div className="shop-admin-form">
-  <input
-    type="email"
-    placeholder="Email admin"
-    value={adminEmails[shop.shop_id] || ""}
-    onChange={(e) =>
-      setAdminEmails((prev) => ({
-        ...prev,
-        [shop.shop_id]: e.target.value,
-      }))
-    }
-  />
-
-  <button
-    type="button"
-    onClick={() => handleAddAdmin(shop.shop_id)}
-    disabled={addingAdminFor === shop.shop_id}
-  >
-    {addingAdminFor === shop.shop_id
-      ? "Aggiunta..."
-      : "Aggiungi admin"}
-  </button>
-</div>
-
-                  <div>
-                    <span>{shop.active ? "Attivo" : "In pausa"}</span>
+                  <div className="shop-status">
+                    <span className={shop.active ? "status-pill active" : "status-pill paused"}>
+                      {shop.active ? "Attivo" : "In pausa"}
+                    </span>
                     <p>Pagamento: {shop.payment_status || shop.subscription_status}</p>
                   </div>
 
-                  <div>
-                    <strong>{shop.customer_count}</strong>
-                    <p>clienti</p>
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <strong>{shop.customer_count}</strong>
+                      <p>clienti</p>
+                    </div>
+
+                    <div className="metric-card">
+                      <strong>{shop.admin_count}</strong>
+                      <p>admin</p>
+                    </div>
+
+                    <div className="metric-card">
+                      <strong>{shop.booking_count}</strong>
+                      <p>prenotazioni</p>
+                    </div>
                   </div>
 
-                  <div>
-                    <strong>{shop.admin_count}</strong>
-                    <p>admin</p>
-                  </div>
-
-                  <div>
-                    <strong>{shop.booking_count}</strong>
-                    <p>prenotazioni</p>
-                  </div>
-
-                  <div>
+                  <div className="shop-actions">
                     <button
                       type="button"
                       className="secondary"
@@ -500,6 +478,28 @@ function App() {
                         : shop.active
                           ? "Metti in pausa"
                           : "Riattiva"}
+                    </button>
+                  </div>
+
+                  <div className="shop-admin-form">
+                    <input
+                      type="email"
+                      placeholder="Email nuovo admin"
+                      value={adminEmails[shop.shop_id] || ""}
+                      onChange={(e) =>
+                        setAdminEmails((prev) => ({
+                          ...prev,
+                          [shop.shop_id]: e.target.value,
+                        }))
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddAdmin(shop.shop_id)}
+                      disabled={addingAdminFor === shop.shop_id}
+                    >
+                      {addingAdminFor === shop.shop_id ? "Aggiunta..." : "Aggiungi admin"}
                     </button>
                   </div>
                 </div>

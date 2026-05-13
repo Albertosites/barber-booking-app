@@ -1,9 +1,37 @@
+import { supabase } from "../../supabaseClient";
+
 function ShopSelectScreen({
   linkedShops,
   currentShopId,
   setCurrentShopId,
   setShopChoiceCompleted,
 }) {
+async function handleLeaveShop(shop) {
+  const firstConfirm = window.confirm(
+    `Vuoi davvero rimuovere "${shop.name}" dal tuo account?`
+  );
+
+  if (!firstConfirm) return;
+
+  const secondConfirm = window.confirm(
+    "Perderai l'accesso alle prenotazioni e ai dati di questo salone."
+  );
+
+  if (!secondConfirm) return;
+
+  const { error } = await supabase.rpc("leave_shop", {
+    p_shop_id: shop.id,
+  });
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile rimuovere il salone.");
+    return;
+  }
+
+  window.location.reload();
+}
+  
   return (
     <section className="screen shop-select-screen">
       <div className="shop-select-hero">
@@ -16,24 +44,57 @@ function ShopSelectScreen({
 
       <div className="shop-select-list">
         {linkedShops.map((shop) => {
-          const isActive = currentShopId === shop.id;
+          const isSelected = currentShopId === shop.id;
+          const isShopActive = shop.active !== false;
 
           return (
             <button
               key={shop.id}
               type="button"
-              className={isActive ? "shop-select-card active" : "shop-select-card"}
+              disabled={!isShopActive}
+              className={[
+                "shop-select-card",
+                isSelected ? "active" : "",
+                !isShopActive ? "disabled" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => {
-  setCurrentShopId(shop.id);
-  setShopChoiceCompleted(true);
-}}
+                if (!isShopActive) return;
+
+                setCurrentShopId(shop.id);
+                setShopChoiceCompleted(true);
+              }}
             >
               <div>
                 <strong>{shop.name || "Barber Shop"}</strong>
                 {shop.slug && <span>@{shop.slug}</span>}
+
+                <button
+  type="button"
+  className="shop-remove-button"
+  onClick={(e) => {
+    e.stopPropagation();
+    handleLeaveShop(shop);
+  }}
+>
+  Rimuovi salone
+</button>
+
+                {!isShopActive && (
+                  <span className="shop-paused-badge">
+                    Salone temporaneamente sospeso
+                  </span>
+                )}
               </div>
 
-              <small>{isActive ? "Selezionato" : "Entra"}</small>
+              <small>
+                {!isShopActive
+                  ? "Non disponibile"
+                  : isSelected
+                    ? "Selezionato"
+                    : "Entra"}
+              </small>
             </button>
           );
         })}
