@@ -1,5 +1,5 @@
 import { supabase } from "../../supabaseClient";
-
+import { X } from "lucide-react";
 function ShopSelectScreen({
   linkedShops,
   currentShopId,
@@ -72,13 +72,13 @@ async function handleLeaveShop(shop) {
 
                 <button
   type="button"
-  className="shop-remove-button"
+  className="shop-remove-icon"
   onClick={(e) => {
     e.stopPropagation();
     handleLeaveShop(shop);
   }}
 >
-  Rimuovi salone
+  <X size={14} strokeWidth={2.5} />
 </button>
 
                 {!isShopActive && (
