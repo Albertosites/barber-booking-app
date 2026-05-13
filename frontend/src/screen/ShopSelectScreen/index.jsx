@@ -66,27 +66,32 @@ async function handleLeaveShop(shop) {
                 setShopChoiceCompleted(true);
               }}
             >
-              <div>
-                <strong>{shop.name || "Barber Shop"}</strong>
-                {shop.slug && <span>@{shop.slug}</span>}
+              <>
+  <div className="shop-card-left">
+    <button
+      type="button"
+      className="shop-remove-icon"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleLeaveShop(shop);
+      }}
+    >
+      <X size={14} strokeWidth={2.5} />
+    </button>
 
-                <button
-  type="button"
-  className="shop-remove-icon"
-  onClick={(e) => {
-    e.stopPropagation();
-    handleLeaveShop(shop);
-  }}
->
-  <X size={14} strokeWidth={2.5} />
-</button>
+    <div className="shop-card-info">
+      <strong>{shop.name || "Barber Shop"}</strong>
 
-                {!isShopActive && (
-                  <span className="shop-paused-badge">
-                    Salone temporaneamente sospeso
-                  </span>
-                )}
-              </div>
+      {shop.slug && <span>@{shop.slug}</span>}
+
+      {!isShopActive && (
+        <span className="shop-paused-badge">
+          Salone temporaneamente sospeso
+        </span>
+      )}
+    </div>
+  </div>
+</>
 
               <small>
                 {!isShopActive
