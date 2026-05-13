@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
 
-const SHOP_ID = "0c0f8c8e-6b93-45a0-a97b-688394b769a3";
 
 const OPENING_REASON_PREFIX = "__EXCEPTIONAL_OPENING__:";
 
@@ -354,7 +353,7 @@ function App() {
   const [shopGateReady, setShopGateReady] = useState(false);
   const [shopChoiceCompleted, setShopChoiceCompleted] = useState(false);
   const [linkedShops, setLinkedShops] = useState([]);
-  const activeShopId = currentShopId || SHOP_ID;
+  const activeShopId = currentShopId;
 
   const [serviceCategories, setServiceCategories] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
@@ -629,6 +628,10 @@ function App() {
   
   
   useEffect(() => {
+  if (!activeShopId) {
+  return;
+}
+
   loadShopSettings();
   loadServices();
   loadHomeImages();
@@ -647,7 +650,7 @@ function App() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [currentShopId]);
+}, [activeShopId]);
 
   useEffect(() => {
     if (session?.user) {
@@ -714,8 +717,32 @@ function App() {
   }
 
   async function loadShopSettings() {
+  const { data, error } = await supabase
+    .from("shops")
+    .select("id, name, slug, active")
+    .eq("id", activeShopId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
     setShopSettings(defaultShopSettings);
+    return;
   }
+
+  if (!data) {
+    setShopSettings(defaultShopSettings);
+    return;
+  }
+
+  setShopSettings({
+    ...defaultShopSettings,
+    logo_letter: data.name?.charAt(0)?.toUpperCase() || defaultShopSettings.logo_letter,
+    name: data.name || defaultShopSettings.name,
+    hero_badge: data.name || defaultShopSettings.hero_badge,
+    hero_title: `Prenota il tuo appuntamento da ${data.name || defaultShopSettings.name}.`,
+  });
+}
 
   function closeAllModals() {
     setShowPrivacyModal(false);
@@ -2021,7 +2048,7 @@ return validShops;
         return;
       }
 
-      const member = await isCurrentShopMember(data.user.id);
+      const member = activeShopId ? await isCurrentShopMember(data.user.id) : true;
 
       setAuthEmail("");
 setAuthPassword("");
@@ -2057,7 +2084,7 @@ await loadLinkedShops(data.user.id);
     });
 
     if (!loginError) {
-      const member = await isCurrentShopMember(loginData.user.id);
+      const member = activeShopId ? await isCurrentShopMember(loginData.user.id) : true;
 
       await saveUserProfile(loginData.user.id, cleanEmail, cleanName, cleanPhone);
 
