@@ -652,16 +652,19 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [activeShopId]);
 
-  useEffect(() => {
-    if (session?.user) {
-      loadUserProfile(session.user.id);
+ useEffect(() => {
+  if (session?.user) {
+    loadUserProfile(session.user.id);
+    loadLinkedShops(session.user.id);
+
+    if (activeShopId) {
       loadMyBookings(session.user.id);
       checkAdmin(session.user.id);
-      loadLinkedShops(session.user.id);
     }
+  }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, activeShopId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [session, activeShopId]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -820,6 +823,10 @@ function App() {
   }
 
   async function isCurrentShopMember(userId) {
+    if (!activeShopId) {
+  return false;
+}
+    
     const { data, error } = await supabase
       .from("shop_members")
       .select("id")
@@ -884,6 +891,11 @@ function App() {
   }
 
   async function checkAdmin(userId) {
+    if (!activeShopId) {
+  setIsAdmin(false);
+  return;
+}
+    
     const { data, error } = await supabase
       .from("shop_members")
       .select("role")
@@ -1962,6 +1974,11 @@ return validShops;
   }
 
   async function loadMyBookings(userId) {
+    if (!activeShopId) {
+  setMyBookings([]);
+  return;
+}
+    
     const { data, error } = await supabase
       .from("bookings")
       .select("*")

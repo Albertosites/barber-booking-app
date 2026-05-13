@@ -39,6 +39,9 @@ function App() {
 
   const [shops, setShops] = useState([]);
   const [shopsLoading, setShopsLoading] = useState(false);
+  const [adminEmails, setAdminEmails] = useState({});
+  const [addingAdminFor, setAddingAdminFor] = useState(null);
+  const [updatingShopId, setUpdatingShopId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -115,6 +118,39 @@ function App() {
     setShops(data || []);
   }
 
+  async function handleAddAdmin(shopId) {
+  const email = (adminEmails[shopId] || "").trim();
+
+  if (!email) {
+    alert("Inserisci una email.");
+    return;
+  }
+
+  setAddingAdminFor(shopId);
+
+  const { error } = await supabase.rpc("add_shop_admin_by_email", {
+    p_shop_id: shopId,
+    p_email: email,
+  });
+
+  setAddingAdminFor(null);
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile aggiungere l'admin.");
+    return;
+  }
+
+  setAdminEmails((prev) => ({
+    ...prev,
+    [shopId]: "",
+  }));
+
+  await loadShopsOverview();
+
+  alert("Admin aggiunto correttamente.");
+}
+
   async function handleCreateShop(e) {
     e.preventDefault();
 
@@ -161,6 +197,50 @@ function App() {
     await loadShopsOverview();
 
     alert("Shop creato correttamente.");
+  }
+
+  async function toggleShopActive(shop) {
+    if (updatingShopId) return;
+
+    const nextActive = !shop.active;
+    let pausedReason = null;
+
+    if (!nextActive) {
+      pausedReason = window.prompt(
+        `Motivo pausa per "${shop.name}"`,
+        "Pagamento non ricevuto"
+      );
+
+      if (pausedReason === null) return;
+    }
+
+    const confirmed = window.confirm(
+      nextActive
+        ? `Vuoi riattivare lo shop "${shop.name}"?`
+        : `Vuoi mettere in pausa lo shop "${shop.name}"?`
+    );
+
+    if (!confirmed) return;
+
+    setUpdatingShopId(shop.shop_id);
+
+    const { error } = await supabase.rpc("set_shop_active_status", {
+      p_shop_id: shop.shop_id,
+      p_active: nextActive,
+      p_paused_reason: pausedReason,
+    });
+
+    setUpdatingShopId("");
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile aggiornare lo stato dello shop.");
+      return;
+    }
+
+    await loadShopsOverview();
+
+    alert(nextActive ? "Shop riattivato." : "Shop messo in pausa.");
   }
 
   async function handleLogin(e) {
@@ -364,6 +444,30 @@ function App() {
                     </p>
                   </div>
 
+                  <div className="shop-admin-form">
+  <input
+    type="email"
+    placeholder="Email admin"
+    value={adminEmails[shop.shop_id] || ""}
+    onChange={(e) =>
+      setAdminEmails((prev) => ({
+        ...prev,
+        [shop.shop_id]: e.target.value,
+      }))
+    }
+  />
+
+  <button
+    type="button"
+    onClick={() => handleAddAdmin(shop.shop_id)}
+    disabled={addingAdminFor === shop.shop_id}
+  >
+    {addingAdminFor === shop.shop_id
+      ? "Aggiunta..."
+      : "Aggiungi admin"}
+  </button>
+</div>
+
                   <div>
                     <span>{shop.active ? "Attivo" : "In pausa"}</span>
                     <p>Pagamento: {shop.payment_status || shop.subscription_status}</p>
@@ -382,6 +486,21 @@ function App() {
                   <div>
                     <strong>{shop.booking_count}</strong>
                     <p>prenotazioni</p>
+                  </div>
+
+                  <div>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => toggleShopActive(shop)}
+                      disabled={updatingShopId === shop.shop_id}
+                    >
+                      {updatingShopId === shop.shop_id
+                        ? "Aggiornamento..."
+                        : shop.active
+                          ? "Metti in pausa"
+                          : "Riattiva"}
+                    </button>
                   </div>
                 </div>
               ))}
