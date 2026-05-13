@@ -4,12 +4,10 @@ import "./App.css";
 
 async function checkPlatformAdminStatus() {
   const { data, error } = await supabase.rpc("is_platform_admin");
-
   if (error) {
     console.error(error);
     return false;
   }
-
   return Boolean(data);
 }
 
@@ -32,13 +30,19 @@ function App() {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
+  const [showCreateShop, setShowCreateShop] = useState(false);
   const [shopName, setShopName] = useState("");
   const [shopSlug, setShopSlug] = useState("");
+  const [shopCity, setShopCity] = useState("");
+  const [shopAddress, setShopAddress] = useState("");
   const [creatingShop, setCreatingShop] = useState(false);
   const [createdShop, setCreatedShop] = useState(null);
 
   const [shops, setShops] = useState([]);
   const [shopsLoading, setShopsLoading] = useState(false);
+  const [expandedShopId, setExpandedShopId] = useState("");
+  const [editShops, setEditShops] = useState({});
+  const [savingShopId, setSavingShopId] = useState("");
   const [adminEmails, setAdminEmails] = useState({});
   const [addingAdminFor, setAddingAdminFor] = useState(null);
   const [updatingShopId, setUpdatingShopId] = useState("");
@@ -102,6 +106,38 @@ function App() {
     }
   }
 
+  function openShopDetails(shop) {
+    const isAlreadyOpen = expandedShopId === shop.shop_id;
+
+    if (isAlreadyOpen) {
+      setExpandedShopId("");
+      return;
+    }
+
+    setExpandedShopId(shop.shop_id);
+
+    setEditShops((prev) => ({
+      ...prev,
+      [shop.shop_id]: {
+        name: shop.name || "",
+        slug: shop.slug || "",
+        city: shop.city || "",
+        address: shop.address || "",
+        payment_status: shop.payment_status || shop.subscription_status || "active",
+      },
+    }));
+  }
+
+  function updateEditShopField(shopId, field, value) {
+    setEditShops((prev) => ({
+      ...prev,
+      [shopId]: {
+        ...(prev[shopId] || {}),
+        [field]: field === "slug" ? createSlugFromName(value) : value,
+      },
+    }));
+  }
+
   async function loadShopsOverview() {
     setShopsLoading(true);
 
@@ -116,6 +152,48 @@ function App() {
     }
 
     setShops(data || []);
+  }
+
+  async function saveShopDetails(shop) {
+    const draft = editShops[shop.shop_id];
+
+    if (!draft) return;
+
+    const cleanName = String(draft.name || "").trim();
+    const cleanSlug = createSlugFromName(draft.slug || cleanName);
+
+    if (!cleanName) {
+      alert("Il nome dello shop non può essere vuoto.");
+      return;
+    }
+
+    if (!cleanSlug) {
+      alert("Lo slug non è valido.");
+      return;
+    }
+
+    setSavingShopId(shop.shop_id);
+
+    const { error } = await supabase.rpc("update_platform_shop_details", {
+      p_shop_id: shop.shop_id,
+      p_name: cleanName,
+      p_slug: cleanSlug,
+      p_city: String(draft.city || "").trim(),
+      p_address: String(draft.address || "").trim(),
+      p_payment_status: draft.payment_status || "active",
+    });
+
+    setSavingShopId("");
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile salvare le modifiche dello shop.");
+      return;
+    }
+
+    await loadShopsOverview();
+
+    alert("Shop aggiornato.");
   }
 
   async function handleAddAdmin(shopId) {
@@ -158,6 +236,8 @@ function App() {
 
     const cleanName = shopName.trim();
     const cleanSlug = createSlugFromName(shopSlug || shopName);
+    const cleanCity = shopCity.trim();
+    const cleanAddress = shopAddress.trim();
 
     if (!cleanName) {
       alert("Inserisci il nome del salone.");
@@ -174,6 +254,8 @@ function App() {
     const { data, error } = await supabase.rpc("create_shop_with_defaults", {
       p_name: cleanName,
       p_slug: cleanSlug,
+      p_city: cleanCity,
+      p_address: cleanAddress,
     });
 
     setCreatingShop(false);
@@ -188,11 +270,16 @@ function App() {
       id: data,
       name: cleanName,
       slug: cleanSlug,
+      city: cleanCity,
+      address: cleanAddress,
       registerUrl: `/register/${cleanSlug}`,
     });
 
     setShopName("");
     setShopSlug("");
+    setShopCity("");
+    setShopAddress("");
+    setShowCreateShop(false);
 
     await loadShopsOverview();
 
@@ -365,45 +452,76 @@ function App() {
         </div>
 
         <div className="empty-state">
-          <h2>Crea nuovo shop</h2>
-          <p>Crea un nuovo salone con operatori e servizi default già pronti.</p>
+          <div className="topbar">
+            <div>
+              <h2>Creazione shop</h2>
+              <p>Crea un nuovo salone solo quando serve.</p>
+            </div>
 
-          <form className="backoffice-form" onSubmit={handleCreateShop}>
-            <label>
-              Nome salone / barbiere
-              <input
-                type="text"
-                value={shopName}
-                onChange={(e) => handleShopNameChange(e.target.value)}
-                placeholder="Esempio: Barber Mario Rossi"
-                required
-              />
-            </label>
-
-            <label>
-              Slug URL
-              <input
-                type="text"
-                value={shopSlug}
-                onChange={(e) => setShopSlug(createSlugFromName(e.target.value))}
-                placeholder="barber-mario-rossi"
-                required
-              />
-            </label>
-
-            <button type="submit" disabled={creatingShop}>
-              {creatingShop ? "Creazione shop..." : "Crea shop"}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setShowCreateShop((prev) => !prev)}
+            >
+              {showCreateShop ? "Chiudi" : "Crea shop"}
             </button>
-          </form>
+          </div>
+
+          {showCreateShop && (
+            <form className="backoffice-form" onSubmit={handleCreateShop}>
+              <label>
+                Nome salone / barbiere
+                <input
+                  type="text"
+                  value={shopName}
+                  onChange={(e) => handleShopNameChange(e.target.value)}
+                  placeholder="Esempio: Barber Mario Rossi"
+                  required
+                />
+              </label>
+
+              <label>
+                Slug URL
+                <input
+                  type="text"
+                  value={shopSlug}
+                  onChange={(e) => setShopSlug(createSlugFromName(e.target.value))}
+                  placeholder="barber-mario-rossi"
+                  required
+                />
+              </label>
+
+              <label>
+                Città
+                <input
+                  type="text"
+                  value={shopCity}
+                  onChange={(e) => setShopCity(e.target.value)}
+                  placeholder="Esempio: Palermo"
+                />
+              </label>
+
+              <label>
+                Indirizzo
+                <input
+                  type="text"
+                  value={shopAddress}
+                  onChange={(e) => setShopAddress(e.target.value)}
+                  placeholder="Esempio: Via Roma 25"
+                />
+              </label>
+
+              <button type="submit" disabled={creatingShop}>
+                {creatingShop ? "Creazione shop..." : "Crea shop"}
+              </button>
+            </form>
+          )}
 
           {createdShop && (
             <div className="empty-state">
-              <h2>Shop creato</h2>
+              <h2>Ultimo shop creato</h2>
               <p>
                 <strong>{createdShop.name}</strong>
-              </p>
-              <p>
-                ID shop: <code>{createdShop.id}</code>
               </p>
               <p>
                 URL registrazione: <code>{createdShop.registerUrl}</code>
@@ -416,7 +534,7 @@ function App() {
           <div className="topbar">
             <div>
               <h2>Shop creati</h2>
-              <p>Panoramica aggregata senza dati personali dei clienti.</p>
+              <p>Card compatte. Apri i dettagli per modificare dati e gestione.</p>
             </div>
 
             <button type="button" className="secondary" onClick={loadShopsOverview}>
@@ -430,80 +548,174 @@ function App() {
 
           {!shopsLoading && shops.length > 0 && (
             <div className="shop-list">
-              {shops.map((shop) => (
-                <div className="shop-row" key={shop.shop_id}>
-                  <div className="shop-main">
-                    <strong>{shop.name}</strong>
-                    <p>
-                      URL registrazione: <code>/register/{shop.slug}</code>
-                    </p>
-                    <p>
-                      ID: <code>{shop.shop_id}</code>
-                    </p>
-                  </div>
+              {shops.map((shop) => {
+                const isOpen = expandedShopId === shop.shop_id;
+                const draft = editShops[shop.shop_id] || {};
 
-                  <div className="shop-status">
-                    <span className={shop.active ? "status-pill active" : "status-pill paused"}>
-                      {shop.active ? "Attivo" : "In pausa"}
-                    </span>
-                    <p>Pagamento: {shop.payment_status || shop.subscription_status}</p>
-                  </div>
-
-                  <div className="metrics-grid">
-                    <div className="metric-card">
-                      <strong>{shop.customer_count}</strong>
-                      <p>clienti</p>
+                return (
+                  <div className="shop-row compact" key={shop.shop_id}>
+                    <div className="shop-main">
+                      <strong>{shop.name}</strong>
+                      <p>
+                        {[shop.city, shop.address].filter(Boolean).join(" • ") || "Sede non inserita"}
+                      </p>
                     </div>
 
-                    <div className="metric-card">
-                      <strong>{shop.admin_count}</strong>
-                      <p>admin</p>
+                    <div className="shop-status">
+                      <span className={shop.active ? "status-pill active" : "status-pill paused"}>
+                        {shop.active ? "Attivo" : "In pausa"}
+                      </span>
+                      <p>{shop.payment_status || shop.subscription_status}</p>
                     </div>
 
-                    <div className="metric-card">
-                      <strong>{shop.booking_count}</strong>
-                      <p>prenotazioni</p>
+                    <div className="metrics-grid">
+                      <div className="metric-card">
+                        <strong>{shop.customer_count}</strong>
+                        <p>clienti</p>
+                      </div>
+
+                      <div className="metric-card">
+                        <strong>{shop.admin_count}</strong>
+                        <p>admin</p>
+                      </div>
+
+                      <div className="metric-card">
+                        <strong>{shop.booking_count}</strong>
+                        <p>prenotazioni</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="shop-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => toggleShopActive(shop)}
-                      disabled={updatingShopId === shop.shop_id}
-                    >
-                      {updatingShopId === shop.shop_id
-                        ? "Aggiornamento..."
-                        : shop.active
-                          ? "Metti in pausa"
-                          : "Riattiva"}
-                    </button>
-                  </div>
+                    <div className="shop-actions">
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => openShopDetails(shop)}
+                      >
+                        {isOpen ? "Chiudi" : "Apri"}
+                      </button>
+                    </div>
 
-                  <div className="shop-admin-form">
-                    <input
-                      type="email"
-                      placeholder="Email nuovo admin"
-                      value={adminEmails[shop.shop_id] || ""}
-                      onChange={(e) =>
-                        setAdminEmails((prev) => ({
-                          ...prev,
-                          [shop.shop_id]: e.target.value,
-                        }))
-                      }
-                    />
+                    {isOpen && (
+                      <div className="shop-details-panel">
+                        <div className="details-grid">
+                          <label>
+                            Nome
+                            <input
+                              type="text"
+                              value={draft.name || ""}
+                              onChange={(e) =>
+                                updateEditShopField(shop.shop_id, "name", e.target.value)
+                              }
+                            />
+                          </label>
 
-                    <button
-                      type="button"
-                      onClick={() => handleAddAdmin(shop.shop_id)}
-                      disabled={addingAdminFor === shop.shop_id}
-                    >
-                      {addingAdminFor === shop.shop_id ? "Aggiunta..." : "Aggiungi admin"}
-                    </button>
+                          <label>
+                            Slug
+                            <input
+                              type="text"
+                              value={draft.slug || ""}
+                              onChange={(e) =>
+                                updateEditShopField(shop.shop_id, "slug", e.target.value)
+                              }
+                            />
+                          </label>
+
+                          <label>
+                            Città
+                            <input
+                              type="text"
+                              value={draft.city || ""}
+                              onChange={(e) =>
+                                updateEditShopField(shop.shop_id, "city", e.target.value)
+                              }
+                            />
+                          </label>
+
+                          <label>
+                            Indirizzo
+                            <input
+                              type="text"
+                              value={draft.address || ""}
+                              onChange={(e) =>
+                                updateEditShopField(shop.shop_id, "address", e.target.value)
+                              }
+                            />
+                          </label>
+
+                          <label>
+                            Stato pagamento
+                            <select
+                              value={draft.payment_status || "active"}
+                              onChange={(e) =>
+                                updateEditShopField(shop.shop_id, "payment_status", e.target.value)
+                              }
+                            >
+                              <option value="trial">Trial</option>
+                              <option value="active">Active</option>
+                              <option value="unpaid">Unpaid</option>
+                              <option value="grace_period">Grace period</option>
+                              <option value="paused">Paused</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </label>
+                        </div>
+
+                        <div className="details-actions">
+                          <button
+                            type="button"
+                            onClick={() => saveShopDetails(shop)}
+                            disabled={savingShopId === shop.shop_id}
+                          >
+                            {savingShopId === shop.shop_id ? "Salvataggio..." : "Salva modifiche"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => toggleShopActive(shop)}
+                            disabled={updatingShopId === shop.shop_id}
+                          >
+                            {updatingShopId === shop.shop_id
+                              ? "Aggiornamento..."
+                              : shop.active
+                                ? "Metti in pausa"
+                                : "Riattiva"}
+                          </button>
+                        </div>
+
+                        <div className="shop-admin-form">
+                          <input
+                            type="email"
+                            placeholder="Email nuovo admin"
+                            value={adminEmails[shop.shop_id] || ""}
+                            onChange={(e) =>
+                              setAdminEmails((prev) => ({
+                                ...prev,
+                                [shop.shop_id]: e.target.value,
+                              }))
+                            }
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddAdmin(shop.shop_id)}
+                            disabled={addingAdminFor === shop.shop_id}
+                          >
+                            {addingAdminFor === shop.shop_id ? "Aggiunta..." : "Aggiungi admin"}
+                          </button>
+                        </div>
+
+                        <p>
+                          URL registrazione: <code>/register/{shop.slug}</code>
+                        </p>
+                        <p>
+                          ID shop: <code>{shop.shop_id}</code>
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
