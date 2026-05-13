@@ -919,11 +919,13 @@ function App() {
       role,
       shop_id,
       shops (
-        id,
-        name,
-        slug,
-        active
-      )
+  id,
+  name,
+  slug,
+  city,
+  address,
+  active
+)
     `)
     .eq("user_id", userId);
 
