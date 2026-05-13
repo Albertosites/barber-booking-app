@@ -87,7 +87,11 @@ async function handleLeaveShop(shop) {
     <div className="shop-card-info">
       <strong>{shop.name || "Barber Shop"}</strong>
 
-      {shop.slug && <span>@{shop.slug}</span>}
+<span>
+  {[shop.city, shop.address]
+    .filter(Boolean)
+    .join(" • ")}
+</span>
 
       {!isShopActive && (
         <span className="shop-paused-badge">
