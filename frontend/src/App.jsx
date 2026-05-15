@@ -360,6 +360,7 @@ function App() {
   const [shopDataLoading, setShopDataLoading] = useState(false);
   const [loadedShopId, setLoadedShopId] = useState("");
   const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState("agenda");
@@ -603,16 +604,18 @@ function App() {
     return session.user.email?.charAt(0)?.toUpperCase() || "U";
   }, [session, userProfile]);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-    });
+   useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => {
+    setSession(data.session);
+    setAuthReady(true);
+  });
 
  
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
-
+      setAuthReady(true);
+      
       if (event === "PASSWORD_RECOVERY") {
         setShowCredentialsModal(true);
         setNewEmail(currentSession?.user?.email || "");
@@ -2611,7 +2614,16 @@ await loadLinkedShops(data.user.id);
   return (
     <div className="app">
       <main className="phone-shell">
-       
+      {!authReady && (
+  <section className="screen shop-select-screen">
+    <div className="shop-select-hero">
+      <span>BarberBooking</span>
+      <h1>Caricamento</h1>
+      <p>Stiamo controllando il tuo accesso.</p>
+    </div>
+  </section>
+)} 
+        
         {session && !shopGateReady && (
   <section className="screen shop-select-screen">
     <div className="shop-select-hero">
@@ -2631,7 +2643,7 @@ await loadLinkedShops(data.user.id);
   />
 )}
         
-        {!session && (
+      {authReady && !session && (
   <AccountScreen
     setActivePage={setActivePage}
     session={session}
