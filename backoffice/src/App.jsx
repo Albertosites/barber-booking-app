@@ -4,10 +4,12 @@ import "./App.css";
 
 async function checkPlatformAdminStatus() {
   const { data, error } = await supabase.rpc("is_platform_admin");
+
   if (error) {
     console.error(error);
     return false;
   }
+
   return Boolean(data);
 }
 
@@ -39,12 +41,14 @@ function App() {
   const [createdShop, setCreatedShop] = useState(null);
 
   const [shops, setShops] = useState([]);
+  const [shopAdmins, setShopAdmins] = useState([]);
   const [shopsLoading, setShopsLoading] = useState(false);
   const [expandedShopId, setExpandedShopId] = useState("");
   const [editShops, setEditShops] = useState({});
   const [savingShopId, setSavingShopId] = useState("");
   const [adminEmails, setAdminEmails] = useState({});
   const [addingAdminFor, setAddingAdminFor] = useState(null);
+  const [removingAdminId, setRemovingAdminId] = useState("");
   const [updatingShopId, setUpdatingShopId] = useState("");
 
   useEffect(() => {
@@ -87,7 +91,7 @@ function App() {
       setCheckingAdmin(false);
 
       if (result) {
-        await loadShopsOverview();
+        await loadBackofficeData();
       }
     }
 
@@ -97,6 +101,10 @@ function App() {
       active = false;
     };
   }, [session]);
+
+  function getAdminsForShop(shopId) {
+    return shopAdmins.filter((admin) => admin.shop_id === shopId);
+  }
 
   function handleShopNameChange(value) {
     setShopName(value);
@@ -138,21 +146,33 @@ function App() {
     }));
   }
 
-  async function loadShopsOverview() {
+  async function loadBackofficeData() {
     setShopsLoading(true);
 
-    const { data, error } = await supabase.rpc("get_platform_shops_overview");
+    const [shopsResult, adminsResult] = await Promise.all([
+      supabase.rpc("get_platform_shops_overview"),
+      supabase.rpc("get_platform_shop_admins"),
+    ]);
 
     setShopsLoading(false);
 
-    if (error) {
-      console.error(error);
+    if (shopsResult.error) {
+      console.error(shopsResult.error);
       alert("Non è stato possibile caricare la lista shop.");
       return;
     }
 
-    setShops(data || []);
+    if (adminsResult.error) {
+      console.error(adminsResult.error);
+      alert("Non è stato possibile caricare la lista admin.");
+      return;
+    }
+
+    setShops(shopsResult.data || []);
+    setShopAdmins(adminsResult.data || []);
   }
+
+  
 
   async function saveShopDetails(shop) {
     const draft = editShops[shop.shop_id];
@@ -191,7 +211,7 @@ function App() {
       return;
     }
 
-    await loadShopsOverview();
+    await loadBackofficeData();
 
     alert("Shop aggiornato.");
   }
@@ -215,7 +235,7 @@ function App() {
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile aggiungere l'admin.");
+      alert("Non è stato possibile aggiungere l'admin. Verifica che l’utente sia già registrato.");
       return;
     }
 
@@ -224,9 +244,37 @@ function App() {
       [shopId]: "",
     }));
 
-    await loadShopsOverview();
+    await loadBackofficeData();
 
     alert("Admin aggiunto correttamente.");
+  }
+
+  async function removeShopAdmin(shop, admin) {
+    const confirmed = window.confirm(
+      `Vuoi rimuovere ${admin.email} dagli admin di "${shop.name}"?`
+    );
+
+    if (!confirmed) return;
+
+    const removeKey = `${shop.shop_id}-${admin.user_id}`;
+    setRemovingAdminId(removeKey);
+
+    const { error } = await supabase.rpc("remove_shop_admin_by_user_id", {
+      p_shop_id: shop.shop_id,
+      p_user_id: admin.user_id,
+    });
+
+    setRemovingAdminId("");
+
+    if (error) {
+      console.error(error);
+      alert("Non è stato possibile rimuovere l’admin.");
+      return;
+    }
+
+    await loadBackofficeData();
+
+    alert("Admin rimosso.");
   }
 
   async function handleCreateShop(e) {
@@ -281,7 +329,7 @@ function App() {
     setShopAddress("");
     setShowCreateShop(false);
 
-    await loadShopsOverview();
+    await loadBackofficeData();
 
     alert("Shop creato correttamente.");
   }
@@ -325,7 +373,7 @@ function App() {
       return;
     }
 
-    await loadShopsOverview();
+    await loadBackofficeData();
 
     alert(nextActive ? "Shop riattivato." : "Shop messo in pausa.");
   }
@@ -359,6 +407,7 @@ function App() {
     setSession(null);
     setIsPlatformAdmin(false);
     setShops([]);
+    setShopAdmins([]);
   }
 
   if (loadingSession) {
@@ -534,10 +583,10 @@ function App() {
           <div className="topbar">
             <div>
               <h2>Shop creati</h2>
-              <p>Card compatte. Apri i dettagli per modificare dati e gestione.</p>
+              <p>Apri i dettagli per modificare dati, pagamento e admin.</p>
             </div>
 
-            <button type="button" className="secondary" onClick={loadShopsOverview}>
+            <button type="button" className="secondary" onClick={loadBackofficeData}>
               {shopsLoading ? "Aggiornamento..." : "Aggiorna"}
             </button>
           </div>
@@ -551,6 +600,7 @@ function App() {
               {shops.map((shop) => {
                 const isOpen = expandedShopId === shop.shop_id;
                 const draft = editShops[shop.shop_id] || {};
+                const admins = getAdminsForShop(shop.shop_id);
 
                 return (
                   <div className="shop-row compact" key={shop.shop_id}>
@@ -597,120 +647,173 @@ function App() {
 
                     {isOpen && (
                       <div className="shop-details-panel">
-                        <div className="details-grid">
-                          <label>
-                            Nome
-                            <input
-                              type="text"
-                              value={draft.name || ""}
-                              onChange={(e) =>
-                                updateEditShopField(shop.shop_id, "name", e.target.value)
-                              }
-                            />
-                          </label>
+                        <div className="details-two-columns">
+                          <div className="details-left">
+                            <h3>Dati salone</h3>
 
-                          <label>
-                            Slug
-                            <input
-                              type="text"
-                              value={draft.slug || ""}
-                              onChange={(e) =>
-                                updateEditShopField(shop.shop_id, "slug", e.target.value)
-                              }
-                            />
-                          </label>
+                            <div className="details-grid">
+                              <label>
+                                Nome
+                                <input
+                                  type="text"
+                                  value={draft.name || ""}
+                                  onChange={(e) =>
+                                    updateEditShopField(shop.shop_id, "name", e.target.value)
+                                  }
+                                />
+                              </label>
 
-                          <label>
-                            Città
-                            <input
-                              type="text"
-                              value={draft.city || ""}
-                              onChange={(e) =>
-                                updateEditShopField(shop.shop_id, "city", e.target.value)
-                              }
-                            />
-                          </label>
+                              <label>
+                                Slug
+                                <input
+                                  type="text"
+                                  value={draft.slug || ""}
+                                  onChange={(e) =>
+                                    updateEditShopField(shop.shop_id, "slug", e.target.value)
+                                  }
+                                />
+                              </label>
 
-                          <label>
-                            Indirizzo
-                            <input
-                              type="text"
-                              value={draft.address || ""}
-                              onChange={(e) =>
-                                updateEditShopField(shop.shop_id, "address", e.target.value)
-                              }
-                            />
-                          </label>
+                              <label>
+                                Città
+                                <input
+                                  type="text"
+                                  value={draft.city || ""}
+                                  onChange={(e) =>
+                                    updateEditShopField(shop.shop_id, "city", e.target.value)
+                                  }
+                                />
+                              </label>
 
-                          <label>
-                            Stato pagamento
-                            <select
-                              value={draft.payment_status || "active"}
-                              onChange={(e) =>
-                                updateEditShopField(shop.shop_id, "payment_status", e.target.value)
-                              }
-                            >
-                              <option value="trial">Trial</option>
-                              <option value="active">Active</option>
-                              <option value="unpaid">Unpaid</option>
-                              <option value="grace_period">Grace period</option>
-                              <option value="paused">Paused</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                          </label>
+                              <label>
+                                Indirizzo
+                                <input
+                                  type="text"
+                                  value={draft.address || ""}
+                                  onChange={(e) =>
+                                    updateEditShopField(shop.shop_id, "address", e.target.value)
+                                  }
+                                />
+                              </label>
+
+                              <label>
+                                Stato pagamento
+                                <select
+                                  value={draft.payment_status || "active"}
+                                  onChange={(e) =>
+                                    updateEditShopField(shop.shop_id, "payment_status", e.target.value)
+                                  }
+                                >
+                                  <option value="trial">Trial</option>
+                                  <option value="active">Active</option>
+                                  <option value="unpaid">Unpaid</option>
+                                  <option value="grace_period">Grace period</option>
+                                  <option value="paused">Paused</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                              </label>
+                            </div>
+
+                            <div className="details-actions">
+                              <button
+                                type="button"
+                                onClick={() => saveShopDetails(shop)}
+                                disabled={savingShopId === shop.shop_id}
+                              >
+                                {savingShopId === shop.shop_id ? "Salvataggio..." : "Salva modifiche"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={() => toggleShopActive(shop)}
+                                disabled={updatingShopId === shop.shop_id}
+                              >
+                                {updatingShopId === shop.shop_id
+                                  ? "Aggiornamento..."
+                                  : shop.active
+                                    ? "Metti in pausa"
+                                    : "Riattiva"}
+                              </button>
+                            </div>
+
+                            <p>
+                              URL registrazione: <code>/register/{shop.slug}</code>
+                            </p>
+                            <p>
+                              ID shop: <code>{shop.shop_id}</code>
+                            </p>
+                          </div>
+
+                          <div className="details-right">
+                            <h3>Gestione</h3>
+
+                            <div className="metrics-grid">
+                              <div className="metric-card">
+                                <strong>{shop.customer_count}</strong>
+                                <p>clienti</p>
+                              </div>
+
+                              <div className="metric-card">
+                                <strong>{shop.booking_count}</strong>
+                                <p>prenotazioni</p>
+                              </div>
+                            </div>
+
+                            <div className="admin-panel">
+                              <h3>Admin salone</h3>
+
+                              {admins.length === 0 && (
+                                <p>Nessun admin collegato.</p>
+                              )}
+
+                              {admins.length > 0 && (
+                                <div className="admin-list">
+                                  {admins.map((admin) => {
+                                    const removeKey = `${shop.shop_id}-${admin.user_id}`;
+
+                                    return (
+                                      <div className="admin-row" key={admin.user_id}>
+                                        <span>{admin.email}</span>
+
+                                        <button
+                                          type="button"
+                                          className="secondary"
+                                          onClick={() => removeShopAdmin(shop, admin)}
+                                          disabled={removingAdminId === removeKey}
+                                        >
+                                          {removingAdminId === removeKey ? "Rimozione..." : "Rimuovi"}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              <div className="shop-admin-form">
+                                <input
+                                  type="email"
+                                  placeholder="Email nuovo admin"
+                                  value={adminEmails[shop.shop_id] || ""}
+                                  onChange={(e) =>
+                                    setAdminEmails((prev) => ({
+                                      ...prev,
+                                      [shop.shop_id]: e.target.value,
+                                    }))
+                                  }
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddAdmin(shop.shop_id)}
+                                  disabled={addingAdminFor === shop.shop_id}
+                                >
+                                  {addingAdminFor === shop.shop_id ? "Aggiunta..." : "Aggiungi"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-
-                        <div className="details-actions">
-                          <button
-                            type="button"
-                            onClick={() => saveShopDetails(shop)}
-                            disabled={savingShopId === shop.shop_id}
-                          >
-                            {savingShopId === shop.shop_id ? "Salvataggio..." : "Salva modifiche"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => toggleShopActive(shop)}
-                            disabled={updatingShopId === shop.shop_id}
-                          >
-                            {updatingShopId === shop.shop_id
-                              ? "Aggiornamento..."
-                              : shop.active
-                                ? "Metti in pausa"
-                                : "Riattiva"}
-                          </button>
-                        </div>
-
-                        <div className="shop-admin-form">
-                          <input
-                            type="email"
-                            placeholder="Email nuovo admin"
-                            value={adminEmails[shop.shop_id] || ""}
-                            onChange={(e) =>
-                              setAdminEmails((prev) => ({
-                                ...prev,
-                                [shop.shop_id]: e.target.value,
-                              }))
-                            }
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => handleAddAdmin(shop.shop_id)}
-                            disabled={addingAdminFor === shop.shop_id}
-                          >
-                            {addingAdminFor === shop.shop_id ? "Aggiunta..." : "Aggiungi admin"}
-                          </button>
-                        </div>
-
-                        <p>
-                          URL registrazione: <code>/register/{shop.slug}</code>
-                        </p>
-                        <p>
-                          ID shop: <code>{shop.shop_id}</code>
-                        </p>
                       </div>
                     )}
                   </div>
