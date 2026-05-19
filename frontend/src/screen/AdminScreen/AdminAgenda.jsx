@@ -12,6 +12,7 @@ function formatLocalDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+
   return `${year}-${month}-${day}`;
 }
 
@@ -21,8 +22,13 @@ function getTodayString() {
 
 function parseLocalDate(dateString) {
   if (!dateString || typeof dateString !== "string") return null;
+
   const parts = dateString.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) return null;
+
+  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+    return null;
+  }
+
   return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
@@ -34,13 +40,16 @@ function getStartOfWeek(date) {
   const copy = new Date(date);
   const day = copy.getDay();
   const diff = day === 0 ? -6 : 1 - day;
+
   copy.setDate(copy.getDate() + diff);
   copy.setHours(0, 0, 0, 0);
+
   return copy;
 }
 
 function getWeekDays(date) {
   const start = getStartOfWeek(date);
+
   return Array.from({ length: 7 }, (_, index) => {
     const current = new Date(start);
     current.setDate(start.getDate() + index);
@@ -51,6 +60,7 @@ function getWeekDays(date) {
 function getMonthColumns(date) {
   const year = date.getFullYear();
   const month = date.getMonth();
+
   const lastDay = new Date(year, month + 1, 0).getDate();
 
   const days = Array.from({ length: lastDay }, (_, index) => {
@@ -80,6 +90,7 @@ function getBookingsForWeek(bookings, weekDays) {
     .sort((a, b) => {
       const dateCompare = String(a.date || "").localeCompare(String(b.date || ""));
       if (dateCompare !== 0) return dateCompare;
+
       return String(a.time || "").localeCompare(String(b.time || ""));
     });
 }
@@ -128,20 +139,25 @@ export default function AdminAgenda({
     ? adminAgendaFilter
     : "today";
 
-  const visibleBookings = useMemo(() => filteredAdminBookings || [], [filteredAdminBookings]);
+  const visibleBookings = useMemo(() => {
+    return filteredAdminBookings || [];
+  }, [filteredAdminBookings]);
 
-  const todayBookings = useMemo(
-    () => getBookingsForDay(visibleBookings, todayKey),
-    [todayKey, visibleBookings]
-  );
+  const todayBookings = useMemo(() => {
+    return getBookingsForDay(visibleBookings, todayKey);
+  }, [todayKey, visibleBookings]);
 
-  const weekDays = useMemo(() => getWeekDays(todayDate), [todayDate]);
-  const monthColumns = useMemo(() => getMonthColumns(todayDate), [todayDate]);
+  const weekDays = useMemo(() => {
+    return getWeekDays(todayDate);
+  }, [todayDate]);
 
-  const selectedDayBookings = useMemo(
-    () => getBookingsForDay(visibleBookings, selectedAgendaDay),
-    [selectedAgendaDay, visibleBookings]
-  );
+  const monthColumns = useMemo(() => {
+    return getMonthColumns(todayDate);
+  }, [todayDate]);
+
+  const selectedDayBookings = useMemo(() => {
+    return getBookingsForDay(visibleBookings, selectedAgendaDay);
+  }, [selectedAgendaDay, visibleBookings]);
 
   function changeAgendaView(nextView) {
     setSelectedAgendaDay("");
@@ -162,10 +178,22 @@ export default function AdminAgenda({
           alignItems: "center",
           gap: "8px",
           padding: "10px 16px",
+          color: "#111",
         }}
       >
-        <span style={{ fontSize: "18px", lineHeight: 1 }}>←</span>
-        <span>{label}</span>
+        <span
+          style={{
+            fontSize: "18px",
+            lineHeight: 1,
+            color: "#111",
+          }}
+        >
+          ←
+        </span>
+
+        <span style={{ color: "#111" }}>
+          {label}
+        </span>
       </button>
     );
   }
@@ -183,7 +211,10 @@ export default function AdminAgenda({
     return (
       <div className="customer-bookings-list">
         {bookings.map((booking) => (
-          <article className="modern-booking-card admin-booking-card" key={booking.id}>
+          <article
+            className="modern-booking-card admin-booking-card"
+            key={booking.id}
+          >
             <div className="modern-booking-top">
               <div className="modern-time-pill">
                 <span>Ore</span>
@@ -198,9 +229,19 @@ export default function AdminAgenda({
 
             <div className="modern-booking-body">
               <span>Servizio</span>
-              <h3>{booking.service || "Prenotazione telefonica"}</h3>
-              <p>Operatore: {booking.operator_name || "Non assegnato"}</p>
-              <a className="phone-link" href={`tel:${booking.phone}`}>
+
+              <h3>
+                {booking.service || "Prenotazione telefonica"}
+              </h3>
+
+              <p>
+                Operatore: {booking.operator_name || "Non assegnato"}
+              </p>
+
+              <a
+                className="phone-link"
+                href={`tel:${booking.phone}`}
+              >
                 {booking.phone}
               </a>
             </div>
@@ -219,7 +260,9 @@ export default function AdminAgenda({
   }
 
   function renderSlotGrid(dayBookings) {
-    const busyTimes = new Set(dayBookings.map((booking) => booking.time));
+    const busyTimes = new Set(
+      dayBookings.map((booking) => booking.time)
+    );
 
     return (
       <div
@@ -234,7 +277,13 @@ export default function AdminAgenda({
           const isBusy = busyTimes.has(slot);
 
           return (
-            <p key={slot} style={{ margin: 0 }}>
+            <p
+              key={slot}
+              style={{
+                margin: 0,
+                color: "#111",
+              }}
+            >
               <span
                 aria-hidden="true"
                 style={{
@@ -246,7 +295,10 @@ export default function AdminAgenda({
                   marginRight: "8px",
                 }}
               />
-              <strong>{slot}</strong>
+
+              <strong style={{ color: "#111" }}>
+                {slot}
+              </strong>
             </p>
           );
         })}
@@ -259,17 +311,25 @@ export default function AdminAgenda({
 
     return (
       <section className="admin-day-block modern-day-block">
-        {renderBackButton("Torna alla settimana", () => setSelectedAgendaDay(""))}
+        {renderBackButton(
+          "Torna alla settimana",
+          () => setSelectedAgendaDay("")
+        )}
 
         <div className="modern-day-header">
           <div>
             <span>{selectedAgendaDay}</span>
+
             <strong>
-              {parsedDate ? formatFullDay(parsedDate) : formatDateHeader(selectedAgendaDay)}
+              {parsedDate
+                ? formatFullDay(parsedDate)
+                : formatDateHeader(selectedAgendaDay)}
             </strong>
           </div>
 
-          <p>{selectedDayBookings.length} appuntamenti</p>
+          <p>
+            {selectedDayBookings.length} appuntamenti
+          </p>
         </div>
 
         {renderBookingCards(selectedDayBookings)}
@@ -278,7 +338,9 @@ export default function AdminAgenda({
   }
 
   function renderWeekOverview(days, backButton = null) {
-    if (selectedAgendaDay) return renderDayZoom();
+    if (selectedAgendaDay) {
+      return renderDayZoom();
+    }
 
     return (
       <div className="admin-agenda-groups">
@@ -286,7 +348,11 @@ export default function AdminAgenda({
 
         {days.map((day) => {
           const dayKey = formatDateKey(day);
-          const dayBookings = getBookingsForDay(visibleBookings, dayKey);
+
+          const dayBookings = getBookingsForDay(
+            visibleBookings,
+            dayKey
+          );
 
           return (
             <button
@@ -297,11 +363,18 @@ export default function AdminAgenda({
             >
               <div className="modern-day-header">
                 <div>
-                  <span>{dayKey}</span>
-                  <strong>{formatFullDay(day)}</strong>
+                  <span style={{ color: "#111" }}>
+                    {dayKey}
+                  </span>
+
+                  <strong style={{ color: "#111" }}>
+                    {formatFullDay(day)}
+                  </strong>
                 </div>
 
-                <p>{dayBookings.length} appuntamenti</p>
+                <p style={{ color: "#111" }}>
+                  {dayBookings.length} appuntamenti
+                </p>
               </div>
 
               {renderSlotGrid(dayBookings)}
@@ -317,10 +390,16 @@ export default function AdminAgenda({
   }
 
   function renderMonthView() {
-    if (selectedAgendaDay) return renderDayZoom();
+    if (selectedAgendaDay) {
+      return renderDayZoom();
+    }
 
-    if (selectedAgendaWeekIndex !== null && monthColumns[selectedAgendaWeekIndex]) {
-      const selectedWeek = monthColumns[selectedAgendaWeekIndex];
+    if (
+      selectedAgendaWeekIndex !== null &&
+      monthColumns[selectedAgendaWeekIndex]
+    ) {
+      const selectedWeek =
+        monthColumns[selectedAgendaWeekIndex];
 
       return renderWeekOverview(
         selectedWeek,
@@ -336,20 +415,36 @@ export default function AdminAgenda({
       year: "numeric",
     }).format(todayDate);
 
-    const monthBookings = monthColumns.flat().reduce((total, day) => {
-      const dayKey = formatDateKey(day);
-      return total + getBookingsForDay(visibleBookings, dayKey).length;
-    }, 0);
+    const monthBookings = monthColumns
+      .flat()
+      .reduce((total, day) => {
+        const dayKey = formatDateKey(day);
+
+        return (
+          total +
+          getBookingsForDay(
+            visibleBookings,
+            dayKey
+          ).length
+        );
+      }, 0);
 
     return (
       <section className="admin-day-block modern-day-block">
         <div className="modern-day-header">
           <div>
-            <span>Mese</span>
-            <strong>{monthName}</strong>
+            <span style={{ color: "#111" }}>
+              Mese
+            </span>
+
+            <strong style={{ color: "#111" }}>
+              {monthName}
+            </strong>
           </div>
 
-          <p>{monthBookings} app.</p>
+          <p style={{ color: "#111" }}>
+            {monthBookings} app.
+          </p>
         </div>
 
         <div
@@ -361,19 +456,27 @@ export default function AdminAgenda({
           }}
         >
           {monthColumns.slice(0, 5).map((week, weekIndex) => {
-            const weekBookings = getBookingsForWeek(visibleBookings, week);
+            const weekBookings = getBookingsForWeek(
+              visibleBookings,
+              week
+            );
+
             const firstDay = week[0]?.getDate();
-            const lastDay = week[week.length - 1]?.getDate();
+
+            const lastDay =
+              week[week.length - 1]?.getDate();
 
             return (
               <button
                 className="agenda-day-preview"
                 type="button"
                 key={`month-column-${weekIndex}`}
-                onClick={() => setSelectedAgendaWeekIndex(weekIndex)}
+                onClick={() =>
+                  setSelectedAgendaWeekIndex(weekIndex)
+                }
                 style={{
-                  border: "1px solid rgba(255, 255, 255, 0.09)",
-                  background: "rgba(255, 255, 255, 0.035)",
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  background: "rgba(255,255,255,0.035)",
                   borderRadius: "18px",
                   padding: "10px 6px",
                   display: "flex",
@@ -385,27 +488,62 @@ export default function AdminAgenda({
                 <div
                   style={{
                     borderRadius: "14px",
-                    background: "rgba(216, 38, 76, 0.12)",
-                    border: "1px solid rgba(216, 38, 76, 0.35)",
+                    background: "rgba(216,38,76,0.12)",
+                    border: "1px solid rgba(216,38,76,0.35)",
                     padding: "8px 4px",
                   }}
                 >
-                  <strong style={{ display: "block", fontSize: "0.78rem" }}>
+                  <strong
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      color: "#111",
+                    }}
+                  >
                     Sett. {weekIndex + 1}
                   </strong>
-                  <span style={{ display: "block", fontSize: "0.68rem", opacity: 0.75 }}>
+
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "0.68rem",
+                      opacity: 0.6,
+                      color: "#111",
+                    }}
+                  >
                     {firstDay}-{lastDay}
                   </span>
-                  <span style={{ display: "block", fontSize: "0.68rem", opacity: 0.75 }}>
+
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "0.68rem",
+                      opacity: 0.6,
+                      color: "#111",
+                    }}
+                  >
                     {weekBookings.length} app.
                   </span>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "5px",
+                  }}
+                >
                   {week.map((day) => {
                     const dayKey = formatDateKey(day);
-                    const dayBookings = getBookingsForDay(visibleBookings, dayKey);
-                    const hasBookings = dayBookings.length > 0;
+
+                    const dayBookings =
+                      getBookingsForDay(
+                        visibleBookings,
+                        dayKey
+                      );
+
+                    const hasBookings =
+                      dayBookings.length > 0;
 
                     return (
                       <div
@@ -414,21 +552,34 @@ export default function AdminAgenda({
                           borderRadius: "10px",
                           padding: "6px 3px",
                           background: hasBookings
-                            ? "rgba(216, 38, 76, 0.14)"
-                            : "rgba(255, 255, 255, 0.04)",
+                            ? "rgba(216,38,76,0.14)"
+                            : "rgba(255,255,255,0.04)",
                           border: hasBookings
-                            ? "1px solid rgba(216, 38, 76, 0.45)"
-                            : "1px solid rgba(255, 255, 255, 0.07)",
+                            ? "1px solid rgba(216,38,76,0.45)"
+                            : "1px solid rgba(255,255,255,0.07)",
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "center",
                           gap: "2px",
                         }}
                       >
-                        <strong style={{ fontSize: "0.74rem", lineHeight: 1 }}>
+                        <strong
+                          style={{
+                            fontSize: "0.74rem",
+                            lineHeight: 1,
+                            color: "#111",
+                          }}
+                        >
                           {day.getDate()}
                         </strong>
-                        <span style={{ fontSize: "0.62rem", opacity: 0.75 }}>
+
+                        <span
+                          style={{
+                            fontSize: "0.62rem",
+                            opacity: 0.6,
+                            color: "#111",
+                          }}
+                        >
                           {dayBookings.length} app.
                         </span>
                       </div>
@@ -447,21 +598,28 @@ export default function AdminAgenda({
     <div className="admin-panel">
       <div className="section-title">
         <h3>Agenda</h3>
-        <span>{visibleBookings.length} prenotazioni</span>
+
+        <span>
+          {visibleBookings.length} prenotazioni
+        </span>
       </div>
 
       <div className="admin-help-card agenda-help-card">
         <strong>Vista appuntamenti</strong>
+
         <p>
           Le prenotazioni vecchie vengono eliminate automaticamente.
-          Puoi controllare oggi, la settimana o il mese e aprire il singolo giorno.
+          Puoi controllare oggi, la settimana o il mese
+          e aprire il singolo giorno.
         </p>
       </div>
 
       <button
         className="primary-cta manual-booking-toggle"
         type="button"
-        onClick={() => setShowManualBookingForm((current) => !current)}
+        onClick={() =>
+          setShowManualBookingForm((current) => !current)
+        }
         disabled={manualBookingLoading}
       >
         {showManualBookingForm
@@ -470,14 +628,24 @@ export default function AdminAgenda({
       </button>
 
       {showManualBookingForm && (
-        <form className="manual-booking-form" onSubmit={createManualBooking}>
+        <form
+          className="manual-booking-form"
+          onSubmit={createManualBooking}
+        >
           <div className="manual-booking-title">
             <span>Telefonata / banco</span>
-            <strong>Blocca uno slot in agenda</strong>
-            <p>Inserisci una nota interna o il servizio richiesto dal cliente.</p>
+
+            <strong>
+              Blocca uno slot in agenda
+            </strong>
+
+            <p>
+              Inserisci una nota interna o il servizio richiesto dal cliente.
+            </p>
           </div>
 
           <label>Nome cliente</label>
+
           <input
             type="text"
             placeholder="Es. Marco Rossi"
@@ -488,6 +656,7 @@ export default function AdminAgenda({
           />
 
           <label>Telefono</label>
+
           <input
             type="tel"
             placeholder="Es. 3331234567"
@@ -498,6 +667,7 @@ export default function AdminAgenda({
           />
 
           <label>Servizio o nota</label>
+
           <input
             type="text"
             placeholder="Es. taglio, barba, sistemazione veloce..."
@@ -507,13 +677,17 @@ export default function AdminAgenda({
           />
 
           <label>Operatore</label>
+
           <select
             value={manualOperatorId}
             onChange={(e) => {
               setManualOperatorId(e.target.value);
               setManualTime("");
             }}
-            disabled={manualBookingLoading || activeOperators.length === 0}
+            disabled={
+              manualBookingLoading ||
+              activeOperators.length === 0
+            }
             required
           >
             <option value="">
@@ -523,9 +697,14 @@ export default function AdminAgenda({
             </option>
 
             {activeOperators.map((operator) => (
-              <option key={operator.id} value={operator.id}>
+              <option
+                key={operator.id}
+                value={operator.id}
+              >
                 {operator.name}
-                {operator.role ? ` · ${operator.role}` : ""}
+                {operator.role
+                  ? ` · ${operator.role}`
+                  : ""}
               </option>
             ))}
           </select>
@@ -533,6 +712,7 @@ export default function AdminAgenda({
           <div className="admin-form-grid">
             <div>
               <label>Giorno</label>
+
               <input
                 type="date"
                 value={manualDate}
@@ -548,16 +728,24 @@ export default function AdminAgenda({
 
             <div>
               <label>Ora</label>
+
               <select
                 value={manualTime}
                 onChange={(e) => setManualTime(e.target.value)}
                 required
-                disabled={!manualDate || manualBookingLoading}
+                disabled={
+                  !manualDate || manualBookingLoading
+                }
               >
-                <option value="">{manualDate ? "Scegli" : "Prima giorno"}</option>
+                <option value="">
+                  {manualDate ? "Scegli" : "Prima giorno"}
+                </option>
 
                 {manualAvailableSlots.map((slot) => (
-                  <option key={slot} value={slot}>
+                  <option
+                    key={slot}
+                    value={slot}
+                  >
                     {slot}
                   </option>
                 ))}
@@ -565,8 +753,14 @@ export default function AdminAgenda({
             </div>
           </div>
 
-          <button className="primary-cta" type="submit" disabled={manualBookingLoading}>
-            {manualBookingLoading ? "Attendi..." : "Aggiungi in agenda"}
+          <button
+            className="primary-cta"
+            type="submit"
+            disabled={manualBookingLoading}
+          >
+            {manualBookingLoading
+              ? "Attendi..."
+              : "Aggiungi in agenda"}
           </button>
         </form>
       )}
@@ -574,7 +768,11 @@ export default function AdminAgenda({
       <div className="admin-filter-row">
         <button
           type="button"
-          className={currentView === "today" ? "filter-pill active" : "filter-pill"}
+          className={
+            currentView === "today"
+              ? "filter-pill active"
+              : "filter-pill"
+          }
           onClick={() => changeAgendaView("today")}
         >
           Oggi
@@ -582,7 +780,11 @@ export default function AdminAgenda({
 
         <button
           type="button"
-          className={currentView === "week" ? "filter-pill active" : "filter-pill"}
+          className={
+            currentView === "week"
+              ? "filter-pill active"
+              : "filter-pill"
+          }
           onClick={() => changeAgendaView("week")}
         >
           Questa settimana
@@ -590,7 +792,11 @@ export default function AdminAgenda({
 
         <button
           type="button"
-          className={currentView === "month" ? "filter-pill active" : "filter-pill"}
+          className={
+            currentView === "month"
+              ? "filter-pill active"
+              : "filter-pill"
+          }
           onClick={() => changeAgendaView("month")}
         >
           Questo mese
@@ -610,18 +816,24 @@ export default function AdminAgenda({
           <div className="modern-day-header">
             <div>
               <span>{todayKey}</span>
+
               <strong>Oggi</strong>
             </div>
 
-            <p>{todayBookings.length} appuntamenti</p>
+            <p>
+              {todayBookings.length} appuntamenti
+            </p>
           </div>
 
           {renderBookingCards(todayBookings)}
         </section>
       )}
 
-      {currentView === "week" && renderWeekView()}
-      {currentView === "month" && renderMonthView()}
+      {currentView === "week" &&
+        renderWeekView()}
+
+      {currentView === "month" &&
+        renderMonthView()}
     </div>
   );
 }
