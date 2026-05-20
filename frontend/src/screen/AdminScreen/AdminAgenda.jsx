@@ -133,6 +133,7 @@ export default function AdminAgenda({
   const [selectedAgendaWeekIndex, setSelectedAgendaWeekIndex] = useState(null);
   const [selectedSlotBooking, setSelectedSlotBooking] = useState(null);
   const [selectedFreeSlot, setSelectedFreeSlot] = useState(null);
+  const [slotPopupPosition, setSlotPopupPosition] = useState(null);
 
   const todayDate = useMemo(() => new Date(), []);
   const todayKey = getTodayString();
@@ -264,50 +265,87 @@ export default function AdminAgenda({
   }
 
   function renderSlotGrid(dayBookings, dayKey) {
-    return (
-      <div
-        className="agenda-day-preview-list"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(78px, 1fr))",
-          gap: "8px",
-        }}
-      >
-        {AGENDA_SLOTS.map((slot) => {
-          const booking = dayBookings.find((item) => item.time === slot);
-          const isBusy = Boolean(booking);
+  return (
+    <div
+      className="agenda-day-preview-list"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(66px, 1fr))",
+        gap: "6px",
+        position: "relative",
+        overflow: "visible",
+      }}
+    >
+      {AGENDA_SLOTS.map((slot) => {
+        const booking = dayBookings.find((item) => item.time === slot);
+        const isBusy = Boolean(booking);
 
-          return (
+        const isSelectedBusySlot =
+          selectedSlotBooking &&
+          booking &&
+          selectedSlotBooking.id === booking.id;
+
+        const isSelectedFreeSlot =
+          selectedFreeSlot &&
+          selectedFreeSlot.date === dayKey &&
+          selectedFreeSlot.time === slot;
+
+        return (
+          <div
+            key={slot}
+            style={{
+              position: "relative",
+            }}
+          >
             <button
-              key={slot}
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
 
                 if (booking) {
+                  setSelectedFreeSlot(null);
                   setSelectedSlotBooking(booking);
                   return;
                 }
 
-                setSelectedFreeSlot({
-                  date: dayKey,
-                  time: slot,
-                });
+                setSelectedSlotBooking(null);
+
+const today = getTodayString();
+
+if (dayKey < today) {
+  setSelectedFreeSlot({
+    date: dayKey,
+    time: slot,
+    isPast: true,
+  });
+
+  return;
+}
+
+setManualDate(dayKey);
+setManualTime(slot);
+
+setSelectedFreeSlot({
+  date: dayKey,
+  time: slot,
+  isPast: false,
+});
               }}
               style={{
+                width: "100%",
                 border: isBusy
                   ? "1px solid rgba(216,38,76,0.38)"
                   : "1px solid rgba(34,197,94,0.30)",
                 background: isBusy
                   ? "rgba(216,38,76,0.10)"
                   : "rgba(34,197,94,0.08)",
-                borderRadius: "12px",
-                padding: "9px 6px",
-                minHeight: "46px",
+                borderRadius: "10px",
+                padding: "6px 5px",
+                minHeight: "36px",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                gap: "7px",
+                gap: "5px",
                 cursor: "pointer",
               }}
             >
@@ -325,18 +363,281 @@ export default function AdminAgenda({
               <strong
                 style={{
                   color: "#111",
-                  fontSize: "0.88rem",
+                  fontSize: "0.8rem",
                   lineHeight: 1,
                 }}
               >
                 {slot}
               </strong>
             </button>
-          );
-        })}
+
+            {isSelectedBusySlot && (
+              <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top: "44px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "280px",
+                  maxWidth: "calc(100vw - 32px)",
+                  borderRadius: "20px",
+                  background: "#fff",
+                  padding: "18px",
+                  boxShadow: "0 18px 45px rgba(0,0,0,0.25)",
+                  zIndex: 9999,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  animation: "agendaPopupIn 160ms ease-out",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
+                  <div>
+                    <span style={{ color: "#666", fontSize: "0.78rem" }}>
+                      Appuntamento
+                    </span>
+
+                    <h3 style={{ margin: 0, color: "#111" }}>
+                      {booking.time}
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSlotBooking(null)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      fontSize: "1.2rem",
+                      cursor: "pointer",
+                      color: "#111",
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div>
+                  <strong style={{ color: "#111" }}>
+                    {booking.name}
+                  </strong>
+
+                  <p style={{ margin: "5px 0", color: "#444", fontSize: "0.9rem" }}>
+                    {booking.service || "Prenotazione"}
+                  </p>
+
+                  <p style={{ margin: "5px 0", color: "#444", fontSize: "0.9rem" }}>
+                    Operatore: {booking.operator_name || "Non assegnato"}
+                  </p>
+                </div>
+
+                <a
+                  href={`tel:${booking.phone}`}
+                  style={{
+                    textDecoration: "none",
+                    background: "rgba(216,38,76,0.12)",
+                    color: "#D8264C",
+                    padding: "12px",
+                    borderRadius: "14px",
+                    textAlign: "center",
+                    fontWeight: 600,
+                  }}
+                >
+                  {booking.phone}
+                </a>
+
+                <button
+                  className="admin-delete-booking-btn"
+                  type="button"
+                  onClick={() => {
+                    setAdminBookingToDelete(booking);
+                    setSelectedSlotBooking(null);
+                  }}
+                >
+                  Elimina prenotazione
+                </button>
+              </div>
+            )}
+
+            {isSelectedFreeSlot && (
+  <div
+    onClick={(event) => event.stopPropagation()}
+    style={{
+      position: "absolute",
+      top: "44px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "300px",
+      maxWidth: "calc(100vw - 32px)",
+      borderRadius: "20px",
+      background: "#fff",
+      padding: "18px",
+      boxShadow: "0 18px 45px rgba(0,0,0,0.25)",
+      zIndex: 9999,
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+      animation: "agendaPopupIn 160ms ease-out",
+    }}
+  >
+
+
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
+      <div>
+        <span style={{ color: "#666", fontSize: "0.78rem" }}>
+          Nuova prenotazione
+        </span>
+
+        <h3 style={{ margin: 0, color: "#111" }}>
+          {dayKey} · {slot}
+        </h3>
       </div>
-    );
-  }
+
+      <button
+        type="button"
+        onClick={() => setSelectedFreeSlot(null)}
+        style={{
+          border: "none",
+          background: "transparent",
+          fontSize: "1.2rem",
+          cursor: "pointer",
+          color: "#111",
+        }}
+      >
+        ✕
+      </button>
+    </div>
+
+{selectedFreeSlot?.isPast ? (
+  <>
+    <p
+      style={{
+        margin: 0,
+        color: "#444",
+        fontSize: "0.9rem",
+        lineHeight: 1.45,
+      }}
+    >
+      Non è possibile inserire una prenotazione in un giorno già passato.
+    </p>
+
+    <button
+      className="filter-pill"
+      type="button"
+      onClick={() => setSelectedFreeSlot(null)}
+      style={{
+        justifyContent: "center",
+        color: "#111",
+      }}
+    >
+      Ho capito
+    </button>
+  </>
+) : (
+  <>
+
+    <input
+      type="text"
+      placeholder="Nome cliente"
+      value={manualName}
+      onChange={(event) => setManualName(event.target.value)}
+      disabled={manualBookingLoading}
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <input
+      type="tel"
+      placeholder="Telefono"
+      value={manualPhone}
+      onChange={(event) => setManualPhone(event.target.value)}
+      disabled={manualBookingLoading}
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <input
+      type="text"
+      placeholder="Servizio o nota"
+      value={manualService}
+      onChange={(event) => setManualService(event.target.value)}
+      disabled={manualBookingLoading}
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <select
+      value={manualOperatorId}
+      onChange={(event) => setManualOperatorId(event.target.value)}
+      disabled={manualBookingLoading || activeOperators.length === 0}
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    >
+      <option value="">
+        {activeOperators.length > 0
+          ? "Scegli operatore"
+          : "Nessun operatore disponibile"}
+      </option>
+
+      {activeOperators.map((operator) => (
+        <option key={operator.id} value={operator.id}>
+          {operator.name}
+          {operator.role ? ` · ${operator.role}` : ""}
+        </option>
+      ))}
+    </select>
+
+    <button
+      className="primary-cta"
+      type="button"
+      disabled={manualBookingLoading}
+      onClick={(event) => {
+        event.preventDefault();
+
+        setManualDate(dayKey);
+        setManualTime(slot);
+
+        setTimeout(() => {
+          const fakeEvent = {
+            preventDefault: () => {},
+          };
+
+          createManualBooking(fakeEvent);
+        }, 0);
+      }}
+    >
+      {manualBookingLoading ? "Attendi..." : "Salva prenotazione"}
+    </button>
+     </>
+)}
+  </div>
+)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
   function renderDayZoom() {
     const parsedDate = parseLocalDate(selectedAgendaDay);
@@ -375,7 +676,13 @@ export default function AdminAgenda({
     }
 
     return (
-      <div className="admin-agenda-groups">
+      <div
+  className="admin-agenda-groups"
+  style={{
+    position: "relative",
+    overflow: "visible",
+  }}
+>
         {backButton}
 
         {days.map((day) => {
@@ -388,12 +695,24 @@ export default function AdminAgenda({
 
           return (
             <article
-              className="admin-day-block modern-day-block agenda-day-preview"
-              key={dayKey}
-              style={{
-                cursor: "default",
-              }}
-            >
+  className="admin-day-block modern-day-block agenda-day-preview"
+  key={dayKey}
+  style={{
+    cursor: "default",
+    position: "relative",
+    overflow: "visible",
+    zIndex:
+      (selectedFreeSlot && selectedFreeSlot.date === dayKey) ||
+      dayBookings.some(
+        (booking) =>
+          selectedSlotBooking &&
+          selectedSlotBooking.id === booking.id
+      )
+        ? 9999
+        : 1,
+  }}
+>
+              
               <div className="modern-day-header">
                 <div>
                   <span style={{ color: "#111" }}>
@@ -630,15 +949,12 @@ export default function AdminAgenda({
   const slotBookingModal = selectedSlotBooking && (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.18)",
+  zIndex: 9999,
+  padding: 0,
+}}
       onClick={() => setSelectedSlotBooking(null)}
     >
       <div
@@ -741,12 +1057,12 @@ export default function AdminAgenda({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.45)",
+        background: "rgba(0,0,0,0.18)",
         zIndex: 9999,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: 0,
       }}
       onClick={() => setSelectedFreeSlot(null)}
     >
@@ -808,8 +1124,7 @@ export default function AdminAgenda({
 
   return (
     <div className="admin-panel">
-      {slotBookingModal}
-      {freeSlotModal}
+      
 
       <div className="section-title">
         <h3>Agenda</h3>

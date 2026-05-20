@@ -2373,3 +2373,14 @@ select:focus {
   background: rgba(216, 38, 76, 0.18);
   transform: scale(1.06);
 }
+@keyframes agendaPopupIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
