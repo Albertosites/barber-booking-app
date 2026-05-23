@@ -21,13 +21,47 @@ import { supabase } from "./supabaseClient";
 
 const OPENING_REASON_PREFIX = "__EXCEPTIONAL_OPENING__:";
 
-const slots = [
-  "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30",
-  "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00", "18:30",
-];
+function timeStringToMinutes(timeString) {
+  const cleanTime = String(timeString || "").slice(0, 5);
+  const [hours, minutes] = cleanTime.split(":").map(Number);
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function minutesToTimeString(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function generateSlots(openingTime, closingTime, slotMinutes = 30) {
+  const startMinutes = timeStringToMinutes(openingTime || "09:00");
+  const endMinutes = timeStringToMinutes(closingTime || "18:30");
+  const step = Number(slotMinutes || 30);
+
+  if (startMinutes === null || endMinutes === null || step <= 0) {
+    return [
+      "09:00", "09:30", "10:00", "10:30",
+      "11:00", "11:30", "12:00", "12:30",
+      "13:00", "13:30", "14:00", "14:30",
+      "15:00", "15:30", "16:00", "16:30",
+      "17:00", "17:30", "18:00", "18:30",
+    ];
+  }
+
+  const generatedSlots = [];
+
+  for (let current = startMinutes; current <= endMinutes; current += step) {
+    generatedSlots.push(minutesToTimeString(current));
+  }
+
+  return generatedSlots;
+}
 
 const weekdays = [
   { value: 0, label: "Domenica" },
@@ -343,6 +377,9 @@ const defaultShopSettings = {
   opening_label: "Mar - Sab",
   opening_hours: "09:00 - 18:30",
   phone: "333 123 4567",
+  opening_time: "09:00",
+  closing_time: "18:30",
+  slot_minutes: 30,
 };
 
 function App() {
@@ -479,6 +516,18 @@ function App() {
     return getTodayString();
   }, []);
 
+  const slots = useMemo(() => {
+  return generateSlots(
+    shopSettings.opening_time,
+    shopSettings.closing_time,
+    shopSettings.slot_minutes
+  );
+}, [
+  shopSettings.opening_time,
+  shopSettings.closing_time,
+  shopSettings.slot_minutes,
+]);
+
   const filteredAdminBookings = useMemo(() => {
     if (adminAgendaFilter === "today") {
       return adminBookings.filter((booking) => booking.date === today);
@@ -573,7 +622,7 @@ function App() {
 
       return hasAtLeastOneOperatorAvailableAtSlot(bookings, date, slot, activeOperators);
     });
-  }, [activeOperators, availabilityBlocks, bookings, date, operatorId]);
+  }, [slots, activeOperators, availabilityBlocks, bookings, date, operatorId]);
 
   const bookingAvailabilityNotice = useMemo(() => {
     return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots);
@@ -591,7 +640,7 @@ function App() {
 
       return hasAtLeastOneOperatorAvailableAtSlot(bookings, manualDate, slot, activeOperators);
     });
-  }, [activeOperators, availabilityBlocks, bookings, manualDate, manualOperatorId]);
+  }, [slots, activeOperators, availabilityBlocks, bookings, manualDate, manualOperatorId]);
 
   const avatarLabel = useMemo(() => {
     if (!session?.user) return null;
@@ -726,7 +775,7 @@ function App() {
   async function loadShopSettings() {
   const { data, error } = await supabase
     .from("shops")
-    .select("id, name, slug, active")
+    .select("id, name, slug, active, opening_time, closing_time, slot_minutes")
     .eq("id", activeShopId)
     .eq("active", true)
     .maybeSingle();
@@ -743,12 +792,15 @@ function App() {
   }
 
   setShopSettings({
-    ...defaultShopSettings,
-    logo_letter: data.name?.charAt(0)?.toUpperCase() || defaultShopSettings.logo_letter,
-    name: data.name || defaultShopSettings.name,
-    hero_badge: data.name || defaultShopSettings.hero_badge,
-    hero_title: `Prenota il tuo appuntamento da ${data.name || defaultShopSettings.name}.`,
-  });
+  ...defaultShopSettings,
+  logo_letter: data.name?.charAt(0)?.toUpperCase() || defaultShopSettings.logo_letter,
+  name: data.name || defaultShopSettings.name,
+  hero_badge: data.name || defaultShopSettings.hero_badge,
+  hero_title: `Prenota il tuo appuntamento da ${data.name || defaultShopSettings.name}.`,
+  opening_time: data.opening_time || defaultShopSettings.opening_time,
+  closing_time: data.closing_time || defaultShopSettings.closing_time,
+  slot_minutes: data.slot_minutes || defaultShopSettings.slot_minutes,
+});
 }
 
   function closeAllModals() {
