@@ -803,6 +803,41 @@ function App() {
 });
 }
 
+async function saveShopOpeningSettings(payload) {
+  const { data, error } = await supabase
+    .from("shops")
+    .update({
+      opening_time: payload.opening_time,
+      closing_time: payload.closing_time,
+      slot_minutes: Number(payload.slot_minutes || 30),
+    })
+    .eq("id", activeShopId)
+    .select("id, opening_time, closing_time, slot_minutes")
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    alert("Non è stato possibile salvare gli orari del salone.");
+    return false;
+  }
+
+  if (!data) {
+    alert("Nessuna riga aggiornata. Probabile policy UPDATE mancante su Supabase per la tabella shops.");
+    return false;
+  }
+
+  setShopSettings((current) => ({
+    ...current,
+    opening_time: data.opening_time,
+    closing_time: data.closing_time,
+    slot_minutes: data.slot_minutes,
+  }));
+
+  await loadShopSettings();
+
+  return true;
+} 
+  
   function closeAllModals() {
     setShowPrivacyModal(false);
     setShowCredentialsModal(false);
@@ -2835,6 +2870,10 @@ await loadLinkedShops(data.user.id);
                 setAvailabilityWeekday={setAvailabilityWeekday}
                 weekdays={weekdays}
                 slots={slots}
+                shopOpeningTime={shopSettings.opening_time}
+                shopClosingTime={shopSettings.closing_time}
+                shopSlotMinutes={shopSettings.slot_minutes}
+                saveShopOpeningSettings={saveShopOpeningSettings}
                 availabilityStartTime={availabilityStartTime}
                 setAvailabilityStartTime={setAvailabilityStartTime}
                 availabilityEndTime={availabilityEndTime}
@@ -2918,6 +2957,7 @@ await loadLinkedShops(data.user.id);
 
             {!adminLoading && adminTab === "agenda" && (
               <AdminAgenda
+                slots={slots}
                 adminAgendaFilter={adminAgendaFilter}
                 setAdminAgendaFilter={setAdminAgendaFilter}
                 loadAdminBookings={loadAdminBookings}

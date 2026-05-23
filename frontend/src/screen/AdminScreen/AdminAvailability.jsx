@@ -2,6 +2,10 @@ import { useState } from "react";
 export default function AdminAvailability({
   closureBlocks,
   exceptionalOpeningBlocks,
+  shopOpeningTime,
+  shopClosingTime,
+  shopSlotMinutes,
+  saveShopOpeningSettings,
   availabilityTab,
   setAvailabilityTab,
   createAvailabilityBlock,
@@ -42,7 +46,12 @@ export default function AdminAvailability({
 }) {
   const [showClosureForm, setShowClosureForm] = useState(false);
   const [showOpeningForm, setShowOpeningForm] = useState(false);
-    return (
+  const [localOpeningTime, setLocalOpeningTime] = useState(String(shopOpeningTime || "").slice(0, 5));
+  const [localClosingTime, setLocalClosingTime] = useState(String(shopClosingTime || "").slice(0, 5));
+  const [localSlotMinutes, setLocalSlotMinutes] = useState(String(shopSlotMinutes || 30));
+  const [savingShopHours, setSavingShopHours] = useState(false);  
+  
+  return (
     <div className="admin-panel availability-panel">
       <div className="section-title">
         <h3>Disponibilità</h3>
@@ -50,6 +59,67 @@ export default function AdminAvailability({
           {closureBlocks.length} chiusure · {exceptionalOpeningBlocks.length} aperture
         </span>
       </div>
+
+      <div className="admin-help-card">
+  <strong>Orari standard del salone</strong>
+  <p>
+    Slot generati automaticamente da {String(shopOpeningTime || "").slice(0, 5)} a{" "}
+    {String(shopClosingTime || "").slice(0, 5)}, ogni {shopSlotMinutes || 30} minuti.
+  </p>
+
+  <div className="admin-form-grid">
+    <div>
+      <label>Apertura</label>
+      <input
+  type="time"
+  value={localOpeningTime}
+  onChange={(e) => setLocalOpeningTime(e.target.value)}
+/>
+    </div>
+
+    <div>
+      <label>Chiusura</label>
+     <input
+  type="time"
+  value={localClosingTime}
+  onChange={(e) => setLocalClosingTime(e.target.value)}
+/> 
+    </div>
+
+    <div>
+      <label>Durata slot</label>
+      <input
+  type="number"
+  min="5"
+  step="5"
+  value={localSlotMinutes}
+  onChange={(e) => setLocalSlotMinutes(e.target.value)}
+/>
+    </div>
+  </div>
+<button
+  className="primary-cta"
+  type="button"
+  disabled={savingShopHours}
+  onClick={async () => {
+    setSavingShopHours(true);
+
+    const saved = await saveShopOpeningSettings({
+      opening_time: localOpeningTime,
+      closing_time: localClosingTime,
+      slot_minutes: Number(localSlotMinutes || 30),
+    });
+
+    setSavingShopHours(false);
+
+    if (saved) {
+      alert("Orari del salone aggiornati.");
+    }
+  }}
+>
+  {savingShopHours ? "Salvataggio..." : "Salva orari salone"}
+</button>
+</div>  
 
       <div className="admin-help-card">
         <strong>Chiusure e aperture eccezionali</strong>

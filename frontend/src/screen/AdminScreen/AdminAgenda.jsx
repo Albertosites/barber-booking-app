@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
 
-const AGENDA_SLOTS = [
-  "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30",
-  "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00", "18:30",
-];
 
 function formatLocalDateKey(date) {
   const year = date.getFullYear();
@@ -128,12 +121,31 @@ export default function AdminAgenda({
   loadAdminBookings,
   formatDateHeader,
   setAdminBookingToDelete,
+  slots,
 }) {
   const [selectedAgendaDay, setSelectedAgendaDay] = useState("");
   const [selectedAgendaWeekIndex, setSelectedAgendaWeekIndex] = useState(null);
   const [selectedSlotBooking, setSelectedSlotBooking] = useState(null);
+  const [expandedSlotBookingId, setExpandedSlotBookingId] = useState("");
   const [selectedFreeSlot, setSelectedFreeSlot] = useState(null);
   const [slotPopupPosition, setSlotPopupPosition] = useState(null);
+  function openSlotPopupFromButton(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const popupWidth = 300;
+  const margin = 16;
+
+  const preferredLeft = rect.left + rect.width / 2 - popupWidth / 2;
+  const safeLeft = Math.max(
+    margin,
+    Math.min(preferredLeft, window.innerWidth - popupWidth - margin)
+  );
+
+  setSlotPopupPosition({
+    top: rect.bottom + 8,
+    left: safeLeft,
+    width: Math.min(popupWidth, window.innerWidth - margin * 2),
+  });
+}
 
   const todayDate = useMemo(() => new Date(), []);
   const todayKey = getTodayString();
@@ -276,14 +288,57 @@ export default function AdminAgenda({
         overflow: "visible",
       }}
     >
-      {AGENDA_SLOTS.map((slot) => {
-        const booking = dayBookings.find((item) => item.time === slot);
-        const isBusy = Boolean(booking);
+      {slots.map((slot) => {
+        const slotBookings = dayBookings.filter((item) => item.time === slot);
+const booking = slotBookings[0] || null;
 
+const totalOperators = activeOperators.length;
+
+const busyOperatorIds = new Set(
+  slotBookings
+    .map((item) => item.operator_id)
+    .filter(Boolean)
+);
+
+const hasUnassignedBooking = slotBookings.some((item) => !item.operator_id);
+
+const busyOperatorsCount = hasUnassignedBooking
+  ? totalOperators
+  : busyOperatorIds.size;
+
+const isFullyFree = totalOperators > 0 && busyOperatorsCount === 0;
+const isPartiallyBusy =
+  totalOperators > 0 &&
+  busyOperatorsCount > 0 &&
+  busyOperatorsCount < totalOperators;
+const isFullyBusy =
+  totalOperators === 0 ||
+  busyOperatorsCount >= totalOperators;
+
+const slotColor = isFullyBusy
+  ? "#D8264C"
+  : isPartiallyBusy
+  ? "#f59e0b"
+  : "#22c55e";
+
+const slotBorder = isFullyBusy
+  ? "1px solid rgba(216,38,76,0.38)"
+  : isPartiallyBusy
+  ? "1px solid rgba(245,158,11,0.45)"
+  : "1px solid rgba(34,197,94,0.30)";
+
+const slotBackground = isFullyBusy
+  ? "rgba(216,38,76,0.10)"
+  : isPartiallyBusy
+  ? "rgba(245,158,11,0.13)"
+  : "rgba(34,197,94,0.08)";
+
+        
+        
         const isSelectedBusySlot =
-          selectedSlotBooking &&
-          booking &&
-          selectedSlotBooking.id === booking.id;
+  selectedSlotBooking &&
+  selectedSlotBooking.date === dayKey &&
+  selectedSlotBooking.time === slot;
 
         const isSelectedFreeSlot =
           selectedFreeSlot &&
@@ -301,12 +356,17 @@ export default function AdminAgenda({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
+              
 
-                if (booking) {
-                  setSelectedFreeSlot(null);
-                  setSelectedSlotBooking(booking);
-                  return;
-                }
+                if (slotBookings.length > 0) {
+  setSelectedFreeSlot(null);
+  setExpandedSlotBookingId("");
+  setSelectedSlotBooking({
+    date: dayKey,
+    time: slot,
+  });
+  return;
+}
 
                 setSelectedSlotBooking(null);
 
@@ -333,12 +393,8 @@ setSelectedFreeSlot({
               }}
               style={{
                 width: "100%",
-                border: isBusy
-                  ? "1px solid rgba(216,38,76,0.38)"
-                  : "1px solid rgba(34,197,94,0.30)",
-                background: isBusy
-                  ? "rgba(216,38,76,0.10)"
-                  : "rgba(34,197,94,0.08)",
+                border: slotBorder,
+                background: slotBackground,
                 borderRadius: "10px",
                 padding: "6px 5px",
                 minHeight: "36px",
@@ -355,7 +411,7 @@ setSelectedFreeSlot({
                   width: "8px",
                   height: "8px",
                   borderRadius: "999px",
-                  background: isBusy ? "#D8264C" : "#22c55e",
+                  background: slotColor,
                   flexShrink: 0,
                 }}
               />
@@ -378,8 +434,9 @@ setSelectedFreeSlot({
                   position: "absolute",
                   top: "44px",
                   left: "50%",
-                  transform: "translateX(-50%)",
-                  width: "280px",
+right: "auto",
+transform: "translateX(-50%)",
+width: "min(260px, calc(100vw - 64px))",
                   maxWidth: "calc(100vw - 32px)",
                   borderRadius: "20px",
                   background: "#fff",
@@ -399,8 +456,8 @@ setSelectedFreeSlot({
                     </span>
 
                     <h3 style={{ margin: 0, color: "#111" }}>
-                      {booking.time}
-                    </h3>
+  {slot} · {slotBookings.length} prenotazioni
+</h3>
                   </div>
 
                   <button
@@ -418,47 +475,80 @@ setSelectedFreeSlot({
                   </button>
                 </div>
 
-                <div>
-                  <strong style={{ color: "#111" }}>
-                    {booking.name}
-                  </strong>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+  {slotBookings.map((item) => {
+    const isExpanded = expandedSlotBookingId === item.id;
 
-                  <p style={{ margin: "5px 0", color: "#444", fontSize: "0.9rem" }}>
-                    {booking.service || "Prenotazione"}
-                  </p>
+    return (
+      <div
+        key={item.id}
+        style={{
+          border: "1px solid rgba(0,0,0,0.08)",
+          borderRadius: "14px",
+          padding: "10px",
+          background: "rgba(0,0,0,0.02)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            setExpandedSlotBookingId(isExpanded ? "" : item.id)
+          }
+          style={{
+            width: "100%",
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <strong style={{ color: "#111", display: "block" }}>
+            {item.operator_name || "Operatore non assegnato"}
+          </strong>
 
-                  <p style={{ margin: "5px 0", color: "#444", fontSize: "0.9rem" }}>
-                    Operatore: {booking.operator_name || "Non assegnato"}
-                  </p>
-                </div>
+          <span style={{ color: "#444", fontSize: "0.88rem" }}>
+            {item.name} · {item.service || "Prenotazione"}
+          </span>
+        </button>
 
-                <a
-                  href={`tel:${booking.phone}`}
-                  style={{
-                    textDecoration: "none",
-                    background: "rgba(216,38,76,0.12)",
-                    color: "#D8264C",
-                    padding: "12px",
-                    borderRadius: "14px",
-                    textAlign: "center",
-                    fontWeight: 600,
-                  }}
-                >
-                  {booking.phone}
-                </a>
+        {isExpanded && (
+          <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <a
+              href={`tel:${item.phone}`}
+              style={{
+                textDecoration: "none",
+                background: "rgba(216,38,76,0.12)",
+                color: "#D8264C",
+                padding: "10px",
+                borderRadius: "12px",
+                textAlign: "center",
+                fontWeight: 600,
+              }}
+            >
+              {item.phone}
+            </a>
 
-                <button
-                  className="admin-delete-booking-btn"
-                  type="button"
-                  onClick={() => {
-                    setAdminBookingToDelete(booking);
-                    setSelectedSlotBooking(null);
-                  }}
-                >
-                  Elimina prenotazione
-                </button>
-              </div>
-            )}
+            <button
+              className="admin-delete-booking-btn"
+              type="button"
+              onClick={() => {
+                setAdminBookingToDelete(item);
+                setSelectedSlotBooking(null);
+              }}
+            >
+              Elimina prenotazione
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
+
+                
+</div>
+)}
 
             {isSelectedFreeSlot && (
   <div
@@ -467,8 +557,9 @@ setSelectedFreeSlot({
       position: "absolute",
       top: "44px",
       left: "50%",
-      transform: "translateX(-50%)",
-      width: "300px",
+right: "auto",
+transform: "translateX(-50%)",
+width: "min(260px, calc(100vw - 64px))",
       maxWidth: "calc(100vw - 32px)",
       borderRadius: "20px",
       background: "#fff",
@@ -702,14 +793,10 @@ setSelectedFreeSlot({
     position: "relative",
     overflow: "visible",
     zIndex:
-      (selectedFreeSlot && selectedFreeSlot.date === dayKey) ||
-      dayBookings.some(
-        (booking) =>
-          selectedSlotBooking &&
-          selectedSlotBooking.id === booking.id
-      )
-        ? 9999
-        : 1,
+  (selectedFreeSlot && selectedFreeSlot.date === dayKey) ||
+  (selectedSlotBooking && selectedSlotBooking.date === dayKey)
+    ? 9999
+    : 1,
   }}
 >
               
