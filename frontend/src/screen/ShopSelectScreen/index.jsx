@@ -53,31 +53,40 @@ async function handleLeaveShop(shop) {
           const isShopActive = shop.active !== false;
 
           return (
-            <button
-              key={shop.id}
-              type="button"
-              disabled={!isShopActive}
-              className={[
-                "shop-select-card",
-                isSelected ? "active" : "",
-                !isShopActive ? "disabled" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                if (!isShopActive) return;
+            <div
+  key={shop.id}
+  role="button"
+  tabIndex={isShopActive ? 0 : -1}
+  aria-disabled={!isShopActive}
+  className={[
+    "shop-select-card",
+    isSelected ? "active" : "",
+    !isShopActive ? "disabled" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")}
+  onClick={() => {
+    if (!isShopActive) return;
 
-                setCurrentShopId(shop.id);
-                setShopChoiceCompleted(true);
-              }}
-            >
-              <>
+    setCurrentShopId(shop.id);
+    setShopChoiceCompleted(true);
+  }}
+  onKeyDown={(event) => {
+    if (!isShopActive) return;
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setCurrentShopId(shop.id);
+      setShopChoiceCompleted(true);
+    }
+  }}
+>
   <div className="shop-card-left">
     <button
       type="button"
       className="shop-remove-icon"
-      onClick={(e) => {
-        e.stopPropagation();
+      onClick={(event) => {
+        event.stopPropagation();
         handleLeaveShop(shop);
       }}
     >
@@ -87,11 +96,11 @@ async function handleLeaveShop(shop) {
     <div className="shop-card-info">
       <strong>{shop.name || "Barber Shop"}</strong>
 
-<span>
-  {[shop.city, shop.address]
-    .filter(Boolean)
-    .join(" • ")}
-</span>
+      <span>
+        {[shop.city, shop.address]
+          .filter(Boolean)
+          .join(" • ")}
+      </span>
 
       {!isShopActive && (
         <span className="shop-paused-badge">
@@ -100,16 +109,15 @@ async function handleLeaveShop(shop) {
       )}
     </div>
   </div>
-</>
 
-              <small>
-                {!isShopActive
-                  ? "Non disponibile"
-                  : isSelected
-                    ? "Selezionato"
-                    : "Entra"}
-              </small>
-            </button>
+  <small>
+    {!isShopActive
+      ? "Non disponibile"
+      : isSelected
+        ? "Selezionato"
+        : "Entra"}
+  </small>
+</div>
           );
         })}
       </div>

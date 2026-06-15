@@ -914,23 +914,30 @@ width: "min(260px, calc(100vw - 64px))",
                   setSelectedAgendaWeekIndex(weekIndex)
                 }
                 style={{
-                  border: "1px solid rgba(255,255,255,0.09)",
-                  background: "rgba(255,255,255,0.035)",
-                  borderRadius: "18px",
-                  padding: "10px 6px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "8px",
-                  minWidth: 0,
-                }}
+  border: "1px solid rgba(17,17,17,0.07)",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,246,242,0.96) 100%)",
+  borderRadius: "18px",
+  padding: "10px 6px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  minWidth: 0,
+  boxShadow:
+    "0 8px 20px rgba(17,17,17,0.045), inset 0 1px 0 rgba(255,255,255,0.9)",
+  transition: "transform 160ms ease, box-shadow 160ms ease",
+}}
               >
                 <div
                   style={{
-                    borderRadius: "14px",
-                    background: "rgba(216,38,76,0.12)",
-                    border: "1px solid rgba(216,38,76,0.35)",
-                    padding: "8px 4px",
-                  }}
+  borderRadius: "14px",
+  background:
+    "linear-gradient(180deg, rgba(197,145,66,0.24) 0%, rgba(197,145,66,0.12) 100%)",
+  border: "1px solid rgba(197,145,66,0.42)",
+  padding: "8px 4px",
+  boxShadow:
+    "0 5px 12px rgba(197,145,66,0.10), inset 0 1px 0 rgba(255,255,255,0.65)",
+}}
                 >
                   <strong
                     style={{
@@ -939,7 +946,7 @@ width: "min(260px, calc(100vw - 64px))",
                       color: "#111",
                     }}
                   >
-                    Sett. {weekIndex + 1}
+                    Sett. {weekIndex + 1} ›
                   </strong>
 
                   <span
@@ -988,19 +995,15 @@ width: "min(260px, calc(100vw - 64px))",
                       <div
                         key={dayKey}
                         style={{
-                          borderRadius: "10px",
-                          padding: "6px 3px",
-                          background: hasBookings
-                            ? "rgba(216,38,76,0.14)"
-                            : "rgba(255,255,255,0.04)",
-                          border: hasBookings
-                            ? "1px solid rgba(216,38,76,0.45)"
-                            : "1px solid rgba(255,255,255,0.07)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "2px",
-                        }}
+  borderRadius: "10px",
+  padding: "6px 3px",
+  background: "transparent",
+  border: "1px solid transparent",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "2px",
+}}
                       >
                         <strong
                           style={{
@@ -1014,10 +1017,11 @@ width: "min(260px, calc(100vw - 64px))",
 
                         <span
                           style={{
-                            fontSize: "0.62rem",
-                            opacity: 0.6,
-                            color: "#111",
-                          }}
+  fontSize: "0.62rem",
+  opacity: hasBookings ? 1 : 0.55,
+  color: hasBookings ? "#D8264C" : "#666",
+  fontWeight: hasBookings ? 700 : 500,
+}}
                         >
                           {dayBookings.length} app.
                         </span>
