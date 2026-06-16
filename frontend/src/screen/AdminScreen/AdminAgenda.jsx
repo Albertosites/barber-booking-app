@@ -126,25 +126,64 @@ export default function AdminAgenda({
   const [selectedAgendaDay, setSelectedAgendaDay] = useState("");
   const [selectedAgendaWeekIndex, setSelectedAgendaWeekIndex] = useState(null);
   const [selectedSlotBooking, setSelectedSlotBooking] = useState(null);
-  const [expandedSlotBookingId, setExpandedSlotBookingId] = useState("");
-  const [selectedFreeSlot, setSelectedFreeSlot] = useState(null);
-  const [slotPopupPosition, setSlotPopupPosition] = useState(null);
-  function openSlotPopupFromButton(event) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const popupWidth = 300;
-  const margin = 16;
+const [expandedSlotBookingId, setExpandedSlotBookingId] = useState("");
+const [showPartialSlotBookingForm, setShowPartialSlotBookingForm] =
+  useState(false);
+const [selectedFreeSlot, setSelectedFreeSlot] = useState(null);
+const [slotPopupPosition, setSlotPopupPosition] = useState(null);
 
-  const preferredLeft = rect.left + rect.width / 2 - popupWidth / 2;
-  const safeLeft = Math.max(
-    margin,
-    Math.min(preferredLeft, window.innerWidth - popupWidth - margin)
+function prepareSlotPopupPosition(event) {
+  const slotButton = event.currentTarget;
+
+  const slotGrid = slotButton.closest(
+    ".agenda-day-preview-list"
   );
 
-  setSlotPopupPosition({
-    top: rect.bottom + 8,
-    left: safeLeft,
-    width: Math.min(popupWidth, window.innerWidth - margin * 2),
-  });
+  if (!slotGrid) {
+    setSlotPopupPosition(null);
+    return;
+  }
+
+  const buttonRect = slotButton.getBoundingClientRect();
+  const gridRect = slotGrid.getBoundingClientRect();
+
+  const margin = 8;
+
+  const popupWidth = Math.min(
+    260,
+    gridRect.width - margin * 2
+  );
+
+  const preferredViewportLeft =
+    buttonRect.left +
+    buttonRect.width / 2 -
+    popupWidth / 2;
+
+  const minimumViewportLeft =
+    gridRect.left + margin;
+
+  const maximumViewportLeft =
+    gridRect.right - popupWidth - margin;
+
+  const safeViewportLeft = Math.max(
+    minimumViewportLeft,
+    Math.min(
+      preferredViewportLeft,
+      maximumViewportLeft
+    )
+  );
+
+  const availableSpaceBelow =
+  window.innerHeight - buttonRect.bottom;
+
+const placement =
+  availableSpaceBelow < 420 ? "above" : "below";
+
+setSlotPopupPosition({
+  left: safeViewportLeft - buttonRect.left,
+  width: popupWidth,
+  placement,
+});
 }
 
   const todayDate = useMemo(() => new Date(), []);
@@ -315,6 +354,13 @@ const isFullyBusy =
   totalOperators === 0 ||
   busyOperatorsCount >= totalOperators;
 
+const availableOperatorsForSlot = activeOperators.filter(
+  (operator) => !busyOperatorIds.has(operator.id)
+);
+
+const canAddBookingToPartialSlot =
+  isPartiallyBusy && availableOperatorsForSlot.length > 0;        
+        
 const slotColor = isFullyBusy
   ? "#D8264C"
   : isPartiallyBusy
@@ -356,7 +402,13 @@ const slotBackground = isFullyBusy
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-              
+                prepareSlotPopupPosition(event);
+                setShowPartialSlotBookingForm(false);
+                setManualName("");
+setManualPhone("");
+setManualService("");
+setManualOperatorId("");
+
 
                 if (slotBookings.length > 0) {
   setSelectedFreeSlot(null);
@@ -432,12 +484,19 @@ setSelectedFreeSlot({
                 onClick={(event) => event.stopPropagation()}
                 style={{
                   position: "absolute",
-                  top: "44px",
-                  left: "50%",
+top:
+  slotPopupPosition?.placement === "above"
+    ? "auto"
+    : "44px",
+bottom:
+  slotPopupPosition?.placement === "above"
+    ? "44px"
+    : "auto",
+left: slotPopupPosition?.left ?? "50%",
 right: "auto",
-transform: "translateX(-50%)",
-width: "min(260px, calc(100vw - 64px))",
-                  maxWidth: "calc(100vw - 32px)",
+transform: slotPopupPosition ? "none" : "translateX(-50%)",
+width: slotPopupPosition?.width ?? "260px",
+maxWidth: "none",
                   borderRadius: "20px",
                   background: "#fff",
                   padding: "18px",
@@ -546,6 +605,135 @@ width: "min(260px, calc(100vw - 64px))",
   })}
 </div>
 
+  {canAddBookingToPartialSlot && !showPartialSlotBookingForm && (
+  <button
+    className="primary-cta"
+    type="button"
+    onClick={() => {
+      setManualDate(dayKey);
+      setManualTime(slot);
+      setManualOperatorId("");
+      setShowPartialSlotBookingForm(true);
+    }}
+  
+                  
+  >
+    Aggiungi prenotazione
+  </button>
+)}              
+
+{canAddBookingToPartialSlot && showPartialSlotBookingForm && (
+  <>
+    <input
+      type="text"
+      placeholder="Nome cliente"
+      value={manualName}
+      onChange={(event) => setManualName(event.target.value)}
+      disabled={manualBookingLoading}
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <input
+      type="tel"
+      placeholder="Telefono"
+      value={manualPhone}
+      onChange={(event) => setManualPhone(event.target.value)}
+      disabled={manualBookingLoading}
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <input
+      type="text"
+      placeholder="Servizio o nota"
+      value={manualService}
+      onChange={(event) => setManualService(event.target.value)}
+      disabled={manualBookingLoading}
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    />
+
+    <select
+      value={manualOperatorId}
+      onChange={(event) => setManualOperatorId(event.target.value)}
+      disabled={
+        manualBookingLoading ||
+        availableOperatorsForSlot.length === 0
+      }
+      required
+      style={{
+        width: "100%",
+        padding: "12px",
+        borderRadius: "14px",
+        border: "1px solid rgba(0,0,0,0.12)",
+      }}
+    >
+      <option value="">
+        Scegli operatore disponibile
+      </option>
+
+      {availableOperatorsForSlot.map((operator) => (
+        <option key={operator.id} value={operator.id}>
+          {operator.name}
+          {operator.role ? ` · ${operator.role}` : ""}
+        </option>
+      ))}
+    </select>
+
+    <button
+      className="primary-cta"
+      type="button"
+      disabled={manualBookingLoading}
+      onClick={(event) => {
+        event.preventDefault();
+
+        setManualDate(dayKey);
+        setManualTime(slot);
+
+        setTimeout(() => {
+          const fakeEvent = {
+            preventDefault: () => {},
+          };
+
+          createManualBooking(fakeEvent);
+        }, 0);
+      }}
+    >
+      {manualBookingLoading
+        ? "Attendi..."
+        : "Salva prenotazione"}
+    </button>
+
+    <button
+      className="filter-pill"
+      type="button"
+      onClick={() =>
+        setShowPartialSlotBookingForm(false)
+      }
+      style={{
+        justifyContent: "center",
+        color: "#111",
+      }}
+    >
+      Annulla
+    </button>
+  </>
+)}
                 
 </div>
 )}
@@ -555,12 +743,19 @@ width: "min(260px, calc(100vw - 64px))",
     onClick={(event) => event.stopPropagation()}
     style={{
       position: "absolute",
-      top: "44px",
-      left: "50%",
+top:
+  slotPopupPosition?.placement === "above"
+    ? "auto"
+    : "44px",
+bottom:
+  slotPopupPosition?.placement === "above"
+    ? "44px"
+    : "auto",
+left: slotPopupPosition?.left ?? "50%",
 right: "auto",
-transform: "translateX(-50%)",
-width: "min(260px, calc(100vw - 64px))",
-      maxWidth: "calc(100vw - 32px)",
+transform: slotPopupPosition ? "none" : "translateX(-50%)",
+width: slotPopupPosition?.width ?? "260px",
+maxWidth: "none",
       borderRadius: "20px",
       background: "#fff",
       padding: "18px",
@@ -1432,23 +1627,8 @@ width: "min(260px, calc(100vw - 64px))",
         Aggiorna agenda
       </button>
 
-      {currentView === "today" && (
-        <section className="admin-day-block modern-day-block">
-          <div className="modern-day-header">
-            <div>
-              <span>{todayKey}</span>
-
-              <strong>Oggi</strong>
-            </div>
-
-            <p>
-              {todayBookings.length} appuntamenti
-            </p>
-          </div>
-
-          {renderBookingCards(todayBookings)}
-        </section>
-      )}
+      {currentView === "today" &&
+  renderWeekOverview([todayDate])}
 
       {currentView === "week" &&
         renderWeekView()}

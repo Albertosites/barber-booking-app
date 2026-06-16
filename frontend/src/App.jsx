@@ -2858,6 +2858,7 @@ await loadLinkedShops(data.user.id);
               <AdminAvailability
                 closureBlocks={closureBlocks}
                 exceptionalOpeningBlocks={exceptionalOpeningBlocks}
+                filteredAdminBookings={filteredAdminBookings}
                 availabilityTab={availabilityTab}
                 setAvailabilityTab={setAvailabilityTab}
                 createAvailabilityBlock={createAvailabilityBlock}

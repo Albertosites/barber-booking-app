@@ -1,7 +1,22 @@
 import { useState } from "react";
+const HALF_HOUR_TIMES = Array.from(
+  { length: 48 },
+  (_, index) => {
+    const totalMinutes = index * 30;
+    const hours = String(
+      Math.floor(totalMinutes / 60)
+    ).padStart(2, "0");
+    const minutes = String(
+      totalMinutes % 60
+    ).padStart(2, "0");
+
+    return `${hours}:${minutes}`;
+  }
+);
 export default function AdminAvailability({
   closureBlocks,
   exceptionalOpeningBlocks,
+  filteredAdminBookings,
   shopOpeningTime,
   shopClosingTime,
   shopSlotMinutes,
@@ -69,22 +84,34 @@ export default function AdminAvailability({
 
   <div className="admin-form-grid">
     <div>
-      <label>Apertura</label>
-      <input
-  type="time"
-  value={localOpeningTime}
-  onChange={(e) => setLocalOpeningTime(e.target.value)}
-/>
-    </div>
+  <label>Apertura</label>
+
+  <select
+    value={localOpeningTime}
+    onChange={(e) => setLocalOpeningTime(e.target.value)}
+  >
+    {HALF_HOUR_TIMES.map((time) => (
+      <option key={time} value={time}>
+        {time}
+      </option>
+    ))}
+  </select>
+</div>
 
     <div>
-      <label>Chiusura</label>
-     <input
-  type="time"
-  value={localClosingTime}
-  onChange={(e) => setLocalClosingTime(e.target.value)}
-/> 
-    </div>
+  <label>Chiusura</label>
+
+  <select
+    value={localClosingTime}
+    onChange={(e) => setLocalClosingTime(e.target.value)}
+  >
+    {HALF_HOUR_TIMES.map((time) => (
+      <option key={time} value={time}>
+        {time}
+      </option>
+    ))}
+  </select>
+</div>
 
     <div>
       <label>Durata slot</label>
@@ -102,8 +129,66 @@ export default function AdminAvailability({
   type="button"
   disabled={savingShopHours}
   onClick={async () => {
-    setSavingShopHours(true);
+  const bookingsOutsideNewHours = (
+  filteredAdminBookings || []
+).filter((booking) => {
+  const bookingTime = String(booking.time || "").slice(0, 5);
 
+  if (!bookingTime) return false;
+
+  return (
+    bookingTime < localOpeningTime ||
+    bookingTime > localClosingTime
+  );
+});
+
+const affectedBookingsPreview = bookingsOutsideNewHours
+  .slice(0, 6)
+  .map((booking) => {
+    const bookingDate = booking.date || "Data non disponibile";
+    const bookingTime =
+      String(booking.time || "").slice(0, 5) ||
+      "Ora non disponibile";
+    const bookingName =
+      booking.name || "Cliente senza nome";
+
+    return `• ${bookingDate} alle ${bookingTime} — ${bookingName}`;
+  })
+  .join("\n");
+
+const additionalBookingsCount =
+  bookingsOutsideNewHours.length - 6;
+
+const warningMessage =
+  bookingsOutsideNewHours.length > 0
+    ? `Attenzione: ${bookingsOutsideNewHours.length} prenotazione${
+        bookingsOutsideNewHours.length === 1 ? "e risulterebbe" : "i risulterebbero"
+      } fuori dal nuovo orario ${localOpeningTime}-${localClosingTime} e non sarebbe più visibile nella griglia dell’Agenda.\n\n${affectedBookingsPreview}${
+        additionalBookingsCount > 0
+          ? `\n• Altre ${additionalBookingsCount} prenotazioni`
+          : ""
+      }\n\nLe prenotazioni non verranno cancellate. Vuoi continuare comunque?`
+    : `Stai per impostare l’orario del salone dalle ${localOpeningTime} alle ${localClosingTime}. Nessuna prenotazione attuale risulta fuori dal nuovo intervallo. Vuoi continuare?`;
+
+const confirmed = window.confirm(warningMessage);
+
+if (!confirmed) {
+  setLocalOpeningTime(
+    String(shopOpeningTime || "").slice(0, 5)
+  );
+
+  setLocalClosingTime(
+    String(shopClosingTime || "").slice(0, 5)
+  );
+
+  setLocalSlotMinutes(
+    String(shopSlotMinutes || 30)
+  );
+
+  return;
+}
+
+setSavingShopHours(true);
     const saved = await saveShopOpeningSettings({
       opening_time: localOpeningTime,
       closing_time: localClosingTime,
