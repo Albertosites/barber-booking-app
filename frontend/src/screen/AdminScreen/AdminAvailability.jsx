@@ -1,4 +1,9 @@
-import { useState } from "react";
+﻿import { useState, useMemo } from "react";
+
+function getTodayString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 const HALF_HOUR_TIMES = Array.from(
   { length: 48 },
   (_, index) => {
@@ -58,9 +63,43 @@ export default function AdminAvailability({
   openingReason,
   setOpeningReason,
   sortedExceptionalOpeningBlocks,
+  showConfirm,
+  showToast,
+  availabilityDateTo,
+  setAvailabilityDateTo,
 }) {
   const [showClosureForm, setShowClosureForm] = useState(false);
   const [showOpeningForm, setShowOpeningForm] = useState(false);
+
+  const groupedClosureBlocks = useMemo(() => {
+    const recurring = sortedAvailabilityBlocks.filter((b) => b.recurring || !b.full_day || !b.block_date);
+    const nonRecurring = [...sortedAvailabilityBlocks.filter((b) => !b.recurring && b.full_day && b.block_date)]
+      .sort((a, b) => a.block_date.localeCompare(b.block_date));
+
+    const groups = [];
+    let i = 0;
+    while (i < nonRecurring.length) {
+      const group = [nonRecurring[i]];
+      let j = i + 1;
+      while (j < nonRecurring.length) {
+        const prev = group[group.length - 1];
+        const curr = nonRecurring[j];
+        const prevDate = new Date(prev.block_date + "T00:00:00");
+        prevDate.setDate(prevDate.getDate() + 1);
+        const nextDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(prevDate.getDate()).padStart(2, "0")}`;
+        if (nextDateStr === curr.block_date && (prev.reason || null) === (curr.reason || null)) {
+          group.push(curr);
+          j++;
+        } else {
+          break;
+        }
+      }
+      groups.push({ blocks: group, dateFrom: group[0].block_date, dateTo: group[group.length - 1].block_date, reason: group[0].reason, id: group[0].id });
+      i = j;
+    }
+
+    return [...groups, ...recurring.map((b) => ({ blocks: [b], dateFrom: b.block_date, dateTo: b.block_date, reason: b.reason, id: b.id, single: b }))];
+  }, [sortedAvailabilityBlocks]);
   const [localOpeningTime, setLocalOpeningTime] = useState(String(shopOpeningTime || "").slice(0, 5));
   const [localClosingTime, setLocalClosingTime] = useState(String(shopClosingTime || "").slice(0, 5));
   const [localSlotMinutes, setLocalSlotMinutes] = useState(String(shopSlotMinutes || 30));
@@ -170,7 +209,12 @@ const warningMessage =
       }\n\nLe prenotazioni non verranno cancellate. Vuoi continuare comunque?`
     : `Stai per impostare l’orario del salone dalle ${localOpeningTime} alle ${localClosingTime}. Nessuna prenotazione attuale risulta fuori dal nuovo intervallo. Vuoi continuare?`;
 
-const confirmed = window.confirm(warningMessage);
+if (localClosingTime <= localOpeningTime) {
+  showToast("L'orario di chiusura deve essere successivo all'orario di apertura.");
+  return;
+}
+
+const confirmed = await showConfirm(warningMessage);
 
 if (!confirmed) {
   setLocalOpeningTime(
@@ -198,7 +242,7 @@ setSavingShopHours(true);
     setSavingShopHours(false);
 
     if (saved) {
-      alert("Orari del salone aggiornati.");
+      showToast("Orari del salone aggiornati.");
     }
   }}
 >
@@ -244,14 +288,24 @@ setSavingShopHours(true);
             <select value={availabilityMode} onChange={(e) => setAvailabilityMode(e.target.value)} disabled={availabilitySaving}>
               <option value="date_full_day">Giorno specifico - giornata intera</option>
               <option value="date_range">Giorno specifico - fascia oraria</option>
+              <option value="multi_day">Periodo (più giorni consecutivi)</option>
               <option value="recurring_full_day">Ricorrenza settimanale - giornata intera</option>
               <option value="recurring_range">Ricorrenza settimanale - fascia oraria</option>
             </select>
 
-            {availabilityMode.startsWith("date") && (
+            {availabilityMode === "multi_day" && (
+              <>
+                <label>Dal giorno</label>
+                <input type="date" value={availabilityDate} onChange={(e) => setAvailabilityDate(e.target.value)} disabled={availabilitySaving} required min={getTodayString()} />
+                <label>Al giorno</label>
+                <input type="date" value={availabilityDateTo} onChange={(e) => setAvailabilityDateTo(e.target.value)} disabled={availabilitySaving} required min={availabilityDate || getTodayString()} />
+              </>
+            )}
+
+            {availabilityMode.startsWith("date") && availabilityMode !== "multi_day" && (
               <>
                 <label>Giorno</label>
-                <input type="date" value={availabilityDate} onChange={(e) => setAvailabilityDate(e.target.value)} disabled={availabilitySaving} required />
+                <input type="date" value={availabilityDate} onChange={(e) => setAvailabilityDate(e.target.value)} disabled={availabilitySaving} required min={getTodayString()} />
               </>
             )}
 
@@ -318,36 +372,54 @@ setSavingShopHours(true);
             </div>
           ) : (
             <div className="availability-block-list">
-              {sortedAvailabilityBlocks.map((block) => (
-                <article className="modern-booking-card availability-block-card" key={block.id}>
-                  <div className="modern-booking-top">
-                    <div className="modern-time-pill">
-                      <span>{block.recurring ? "Ogni" : "Tipo"}</span>
-                      <strong>{block.recurring ? "↻" : "1x"}</strong>
+              {groupedClosureBlocks.map((group) => {
+                const block = group.single || group.blocks[0];
+                const isGroup = group.blocks.length > 1;
+                const isDeletingGroup = group.blocks.some((b) => availabilityDeletingId === b.id);
+
+                const formatDate = (dateStr) => {
+                  if (!dateStr) return "";
+                  const [y, m, d] = dateStr.split("-");
+                  return `${d}/${m}/${y}`;
+                };
+
+                const title = isGroup
+                  ? `${formatDate(group.dateFrom)} → ${formatDate(group.dateTo)}`
+                  : block.recurring
+                    ? formatAvailabilityBlockTitle(block)
+                    : formatAvailabilityBlockTitle(block);
+
+                return (
+                  <article className="modern-booking-card availability-block-card" key={group.id}>
+                    <div className="modern-booking-top">
+                      <div className="modern-time-pill">
+                        <span>{block.recurring ? "Ogni" : isGroup ? "Periodo" : "Tipo"}</span>
+                        <strong>{block.recurring ? "↻" : isGroup ? `${group.blocks.length}gg` : "1x"}</strong>
+                      </div>
+
+                      <div className="modern-date-block">
+                        <span>{block.recurring ? "Ricorrenza" : isGroup ? "Dal → Al" : "Data"}</span>
+                        <strong>{title}</strong>
+                      </div>
                     </div>
 
-                    <div className="modern-date-block">
-                      <span>{block.recurring ? "Ricorrenza" : "Data"}</span>
-                      <strong>{formatAvailabilityBlockTitle(block)}</strong>
+                    <div className="modern-booking-body">
+                      <span>Blocco</span>
+                      <h3>{isGroup ? "Giornata intera" : formatAvailabilityBlockTime(block)}</h3>
+                      <p>{(group.reason || block.reason) ? (group.reason || block.reason) : "Nessun motivo inserito"}</p>
                     </div>
-                  </div>
 
-                  <div className="modern-booking-body">
-                    <span>Blocco</span>
-                    <h3>{formatAvailabilityBlockTime(block)}</h3>
-                    <p>{getCleanAvailabilityReason(block) || "Nessun motivo inserito"}</p>
-                  </div>
-
-                  <button
-                    className="admin-delete-booking-btn"
-                    type="button"
-                    disabled={availabilityDeletingId === block.id}
-                    onClick={() => deleteAvailabilityBlock(block)}
-                  >
-                    {availabilityDeletingId === block.id ? "Rimozione..." : "Rimuovi chiusura"}
-                  </button>
-                </article>
-              ))}
+                    <button
+                      className="admin-delete-booking-btn"
+                      type="button"
+                      disabled={isDeletingGroup}
+                      onClick={() => deleteAvailabilityBlock(group)}
+                    >
+                      {isDeletingGroup ? "Rimozione..." : "Rimuovi chiusura"}
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           )}
         </>
@@ -372,7 +444,7 @@ setSavingShopHours(true);
             </div>
 
             <label>Giorno da aprire</label>
-            <input type="date" value={openingDate} onChange={(e) => setOpeningDate(e.target.value)} disabled={openingSaving} required />
+            <input type="date" value={openingDate} onChange={(e) => setOpeningDate(e.target.value)} disabled={openingSaving} required min={getTodayString()} />
 
             {openingDate && hasExceptionalOpeningForDate(openingDate, availabilityBlocks) && (
               <div className="availability-notice limited">

@@ -1,4 +1,4 @@
-import ShopSelectScreen from "./screen/ShopSelectScreen";
+﻿import ShopSelectScreen from "./screen/ShopSelectScreen";
 import AdminOffers from "./screen/AdminScreen/AdminOffers";
 import AdminContent from "./screen/AdminScreen/AdminContent";
 import AdminAvailability from "./screen/AdminScreen/AdminAvailability";
@@ -12,6 +12,8 @@ import InfoScreen from "./screen/InfoScreen";
 import CredentialsModal from "./components/CredentialsModal";
 import PrivacyModal from "./components/PrivacyModal";
 import ConfirmDeleteBookingModal from "./components/ConfirmDeleteBookingModal";
+import ConfirmModal from "./components/ConfirmModal";
+import Toast from "./components/Toast";
 import JoinShopPopup from "./components/JoinShopPopup";
 import BottomNav from "./components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -56,7 +58,7 @@ function generateSlots(openingTime, closingTime, slotMinutes = 30) {
 
   const generatedSlots = [];
 
-  for (let current = startMinutes; current <= endMinutes; current += step) {
+  for (let current = startMinutes; current < endMinutes; current += step) {
     generatedSlots.push(minutesToTimeString(current));
   }
 
@@ -83,7 +85,11 @@ const fallbackGallery = [
 ];
 
 function getTodayString() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function parseLocalDate(dateString) {
@@ -129,6 +135,10 @@ function formatLongDate(dateString) {
     month: "long",
     year: "numeric",
   });
+}
+
+function isPhoneValid(phone) {
+  return /^[+\d\s\-().]{6,20}$/.test(phone.trim());
 }
 
 function isEmailProbablyValid(email) {
@@ -296,7 +306,7 @@ function formatAvailabilityBlockTime(block) {
   return `${String(block.start_time || "").slice(0, 5)} → ${String(block.end_time || "").slice(0, 5)}`;
 }
 
-function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableSlots) {
+function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableSlots, allSlots) {
   if (!dateString) return null;
 
   const selectedWeekday = getWeekdayFromDate(dateString);
@@ -355,6 +365,18 @@ function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableS
   }
 
   if (availableSlots.length === 0) {
+    const slotsAfterAvailability = (allSlots || []).filter(
+      (slot) => !isSlotBlockedByAvailability(slot, dateString, availabilityBlocks)
+    );
+
+    if (slotsAfterAvailability.length > 0) {
+      return {
+        type: "closed",
+        title: "Tutti gli orari di questa giornata sono già prenotati.",
+        text: "Prova a scegliere un altro giorno o un altro operatore.",
+      };
+    }
+
     return {
       type: "closed",
       title: "Non ci sono orari disponibili per questa data.",
@@ -437,6 +459,7 @@ function App() {
   const [operatorCreating, setOperatorCreating] = useState(false);
   const [availabilityMode, setAvailabilityMode] = useState("date_full_day");
   const [availabilityDate, setAvailabilityDate] = useState("");
+  const [availabilityDateTo, setAvailabilityDateTo] = useState("");
   const [availabilityWeekday, setAvailabilityWeekday] = useState("1");
   const [availabilityStartTime, setAvailabilityStartTime] = useState("");
   const [availabilityEndTime, setAvailabilityEndTime] = useState("");
@@ -464,6 +487,42 @@ function App() {
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false, message: "", resolve: null, danger: false });
+  const [toastState, setToastState] = useState({ open: false, message: "", type: "info" });
+
+  function showToast(message, type) {
+    if (!type) {
+      const lower = String(message).toLowerCase();
+      if (lower.includes("non è stato possibile") || lower.includes("errore nel") || lower.startsWith("errore") || lower.includes("impossibile")) {
+        type = "error";
+      } else if (
+        lower.includes("aggiornato") || lower.includes("eliminato") || lower.includes("creato") ||
+        lower.includes("confermata") || lower.includes("salvata") || lower.includes("aggiunto") ||
+        lower.includes("rimoss") || lower.includes("caricata") || lower.includes("completat") ||
+        lower.includes("inviato") || lower.includes("collegato") || lower.includes("correttamente") ||
+        lower.includes("aggiornati") || lower.includes("rimossa") || lower.includes("cancellata") ||
+        lower.includes("cancellato") || lower.includes("aggiornata")
+      ) {
+        type = "success";
+      } else {
+        type = "info";
+      }
+    }
+    setToastState({ open: true, message, type });
+  }
+
+  function showConfirm(message, danger = false) {
+    return new Promise((resolve) => {
+      setConfirmState({ open: true, message, resolve, danger });
+    });
+  }
+
+  function handleConfirmChoice(result) {
+    setConfirmState((prev) => {
+      if (prev.resolve) prev.resolve(result);
+      return { open: false, message: "", resolve: null, danger: false };
+    });
+  }
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -512,9 +571,18 @@ function App() {
 
   const shopAddressLine = [shopSettings.address, shopSettings.city].filter(Boolean).join(", ");
 
-  const today = useMemo(() => {
-    return getTodayString();
-  }, []);
+  const [today, setToday] = useState(getTodayString());
+  useEffect(() => {
+    const msUntilMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      return midnight - now;
+    };
+    const timeout = setTimeout(() => {
+      setToday(getTodayString());
+    }, msUntilMidnight());
+    return () => clearTimeout(timeout);
+  }, [today]);
 
   const slots = useMemo(() => {
   return generateSlots(
@@ -625,8 +693,8 @@ function App() {
   }, [slots, activeOperators, availabilityBlocks, bookings, date, operatorId]);
 
   const bookingAvailabilityNotice = useMemo(() => {
-    return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots);
-  }, [availabilityBlocks, availableSlots, date]);
+    return getBookingAvailabilityNotice(date, availabilityBlocks, availableSlots, slots);
+  }, [availabilityBlocks, availableSlots, date, slots]);
 
   const manualAvailableSlots = useMemo(() => {
     return slots.filter((slot) => {
@@ -696,10 +764,6 @@ function App() {
   if (session?.user) {
     loadMyBookings(session.user.id);
     checkAdmin(session.user.id);
-
-    if (isAdmin) {
-      loadAdminData();
-    }
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -817,12 +881,12 @@ async function saveShopOpeningSettings(payload) {
 
   if (error) {
     console.error(error);
-    alert("Non è stato possibile salvare gli orari del salone.");
+    showToast("Non è stato possibile salvare gli orari del salone.");
     return false;
   }
 
   if (!data) {
-    alert("Nessuna riga aggiornata. Probabile policy UPDATE mancante su Supabase per la tabella shops.");
+    showToast("Nessuna riga aggiornata. Probabile policy UPDATE mancante su Supabase per la tabella shops.");
     return false;
   }
 
@@ -901,7 +965,7 @@ async function saveShopOpeningSettings(payload) {
 
     if (error) {
       console.error(error);
-      alert("Account creato, ma non è stato possibile salvare nome e telefono.");
+      showToast("Account creato, ma non è stato possibile salvare nome e telefono.");
       return false;
     }
 
@@ -914,10 +978,15 @@ async function saveShopOpeningSettings(payload) {
   }
 
   async function isCurrentShopMember(userId) {
-    if (!activeShopId) {
-  return false;
-}
-    
+    if (!activeShopId) return false;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      showToast("La tua sessione è scaduta. Effettua di nuovo il login per continuare.");
+      await logout();
+      return false;
+    }
+
     const { data, error } = await supabase
       .from("shop_members")
       .select("id")
@@ -940,7 +1009,7 @@ async function saveShopOpeningSettings(payload) {
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile collegare questo account al salone.");
+      showToast("Non è stato possibile collegare questo account al salone.");
       return false;
     }
 
@@ -971,7 +1040,7 @@ async function saveShopOpeningSettings(payload) {
     }
 
     setJoinShopLoading(false);
-    alert("Account collegato correttamente a questo salone.");
+    showToast("Account collegato correttamente a questo salone.");
   }
 
   async function cancelJoinShop() {
@@ -1033,7 +1102,6 @@ async function saveShopOpeningSettings(payload) {
     .filter((shop) => shop.id && shop.active !== false);
 
   setLinkedShops(validShops);
-  console.log("LINKED SHOPS DEBUG:", validShops);
 
   if (validShops.length === 0) {
   setCurrentShopId("");
@@ -1094,7 +1162,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento dei servizi admin.");
+      showToast("Errore nel caricamento dei servizi admin.");
       return;
     }
 
@@ -1126,7 +1194,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento delle offerte.");
+      showToast("Errore nel caricamento delle offerte.");
       return;
     }
 
@@ -1151,7 +1219,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile creare l’offerta.");
+      showToast("Non è stato possibile creare l’offerta.");
       return false;
     }
 
@@ -1173,7 +1241,7 @@ return validShops;
     const cleanTitle = String(item.title || "").trim();
 
     if (!cleanTitle) {
-      alert("Il titolo dell’offerta non può essere vuoto.");
+      showToast("Il titolo dell’offerta non può essere vuoto.");
       return false;
     }
 
@@ -1193,20 +1261,21 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile salvare l’offerta.");
+      showToast("Non è stato possibile salvare l’offerta.");
       return false;
     }
 
     await loadOffers();
     await loadAdminOffers();
 
-    alert("Offerta aggiornata.");
+    showToast("Offerta aggiornata.");
     return true;
   }
 
   async function deleteAdminOffer(item) {
-    const confirmed = window.confirm(
-      `ATTENZIONE: stai per eliminare definitivamente l’offerta "${item.title || "senza titolo"}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    const confirmed = await showConfirm(
+      `Stai per eliminare definitivamente l’offerta "${item.title || "senza titolo"}".\n\nQuesta operazione non può essere annullata.`,
+      true
     );
 
     if (!confirmed) return false;
@@ -1223,14 +1292,14 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare l’offerta.");
+      showToast("Non è stato possibile eliminare l’offerta.");
       return false;
     }
 
     await loadOffers();
     await loadAdminOffers();
 
-    alert("Offerta eliminata.");
+    showToast("Offerta eliminata.");
     return true;
   }
 
@@ -1243,7 +1312,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento delle immagini admin.");
+      showToast("Errore nel caricamento delle immagini admin.");
       return;
     }
 
@@ -1261,7 +1330,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento degli operatori.");
+      showToast("Errore nel caricamento degli operatori.");
       return;
     }
 
@@ -1278,7 +1347,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento degli operatori admin.");
+      showToast("Errore nel caricamento degli operatori admin.");
       return;
     }
 
@@ -1286,7 +1355,6 @@ return validShops;
   }
 
   async function loadAdminBookings() {
-    await deleteOldBookings();
 
     const { data, error } = await supabase
       .from("bookings")
@@ -1298,7 +1366,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento agenda barbiere.");
+      showToast("Errore nel caricamento agenda barbiere.");
       return;
     }
 
@@ -1335,7 +1403,7 @@ return validShops;
     const cleanName = String(payload.name || "").trim();
 
     if (!cleanCategory || !cleanName) {
-      alert("Inserisci almeno categoria e nome servizio.");
+      showToast("Inserisci almeno categoria e nome servizio.");
       return false;
     }
 
@@ -1358,14 +1426,14 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile creare il servizio.");
+      showToast("Non è stato possibile creare il servizio.");
       return false;
     }
 
     await loadServices();
     await loadAdminServices();
 
-    alert("Servizio creato.");
+    showToast("Servizio creato.");
     return true;
   }
 
@@ -1373,12 +1441,13 @@ return validShops;
     const cleanCategory = String(categoryName || "").trim();
 
     if (!cleanCategory) {
-      alert("Categoria non valida.");
+      showToast("Categoria non valida.");
       return false;
     }
 
-    const confirmed = window.confirm(
-      `ATTENZIONE: stai per eliminare definitivamente la categoria "${cleanCategory}" e tutti i servizi contenuti al suo interno.\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    const confirmed = await showConfirm(
+      `Stai per eliminare la categoria "${cleanCategory}" e tutti i servizi al suo interno.\n\nQuesta operazione non può essere annullata.`,
+      true
     );
 
     if (!confirmed) return false;
@@ -1392,12 +1461,12 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare la categoria.");
+      showToast("Non è stato possibile eliminare la categoria.");
       return false;
     }
 
     if (!data || data.length === 0) {
-      alert("Nessun servizio eliminato. Probabile policy DELETE su Supabase o nome categoria non corrispondente.");
+      showToast("Nessun servizio eliminato. Probabile policy DELETE su Supabase o nome categoria non corrispondente.");
       await loadAdminServices();
       return false;
     }
@@ -1405,11 +1474,27 @@ return validShops;
     await loadServices();
     await loadAdminServices();
 
-    alert("Categoria eliminata.");
+    showToast("Categoria eliminata.");
     return true;
   }
 
   async function saveAdminService(item) {
+    if (!item.name || !item.name.trim()) {
+      showToast("Il nome del servizio non può essere vuoto.");
+      return;
+    }
+    if (!item.category || !item.category.trim()) {
+      showToast("La categoria non può essere vuota.");
+      return;
+    }
+    if (isNaN(Number(item.price)) || Number(item.price) < 0) {
+      showToast("Il prezzo non è valido.");
+      return;
+    }
+    if (isNaN(Number(item.duration_minutes)) || Number(item.duration_minutes) <= 0) {
+      showToast("La durata non è valida.");
+      return;
+    }
     const { error } = await supabase
       .from("services")
       .update({
@@ -1428,20 +1513,21 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile salvare il servizio.");
+      showToast("Non è stato possibile salvare il servizio.");
       return;
     }
 
     await loadServices();
     await loadAdminServices();
-    alert("Servizio aggiornato.");
+    showToast("Servizio aggiornato.");
   }
 
   async function deleteAdminService(item) {
     const serviceName = String(item?.name || "questo servizio").trim();
 
-    const confirmed = window.confirm(
-      `ATTENZIONE: stai per eliminare definitivamente il servizio "${serviceName}".\n\nQuesta operazione non può essere annullata.\n\nVuoi davvero continuare?`
+    const confirmed = await showConfirm(
+      `Stai per eliminare il servizio "${serviceName}".\n\nQuesta operazione non può essere annullata.`,
+      true
     );
 
     if (!confirmed) return false;
@@ -1455,12 +1541,12 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare il servizio.");
+      showToast("Non è stato possibile eliminare il servizio.");
       return false;
     }
 
     if (!data || data.length === 0) {
-      alert("Nessun servizio eliminato. Verifica policy Supabase DELETE.");
+      showToast("Nessun servizio eliminato. Verifica policy Supabase DELETE.");
       await loadAdminServices();
       return false;
     }
@@ -1468,7 +1554,7 @@ return validShops;
     await loadServices();
     await loadAdminServices();
 
-    alert("Servizio eliminato.");
+    showToast("Servizio eliminato.");
     return true;
   }
 
@@ -1486,18 +1572,18 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile salvare l’immagine.");
+      showToast("Non è stato possibile salvare l’immagine.");
       return;
     }
 
     await loadHomeImages();
     await loadAdminImages();
-    alert("Immagine aggiornata.");
+    showToast("Immagine aggiornata.");
   }
 
   async function createAdminHomeImage() {
     if (adminImages.length >= 10) {
-      alert("Puoi caricare massimo 10 immagini Home.");
+      showToast("Puoi caricare massimo 10 immagini Home.");
       return null;
     }
 
@@ -1522,7 +1608,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile creare la nuova immagine.");
+      showToast("Non è stato possibile creare la nuova immagine.");
       return null;
     }
 
@@ -1533,9 +1619,7 @@ return validShops;
   }
 
   async function deleteAdminHomeImage(item) {
-    const confirmed = window.confirm(
-      "Vuoi eliminare definitivamente questa immagine?"
-    );
+    const confirmed = await showConfirm("Vuoi eliminare definitivamente questa immagine?", true);
 
     if (!confirmed) return;
 
@@ -1548,12 +1632,12 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare l’immagine.");
+      showToast("Non è stato possibile eliminare l’immagine.");
       return;
     }
 
     if (!data || data.length === 0) {
-      alert("Nessuna immagine eliminata. Probabile policy Supabase DELETE o ID non corrispondente.");
+      showToast("Nessuna immagine eliminata. Probabile policy Supabase DELETE o ID non corrispondente.");
       await loadAdminImages();
       return;
     }
@@ -1561,7 +1645,7 @@ return validShops;
     await loadHomeImages();
     await loadAdminImages();
 
-    alert("Immagine eliminata.");
+    showToast("Immagine eliminata.");
   }
 
   async function createAdminOperator(e) {
@@ -1573,7 +1657,7 @@ return validShops;
     const cleanRole = newOperatorRole.trim();
 
     if (!cleanName) {
-      alert("Inserisci il nome dell’operatore.");
+      showToast("Inserisci il nome dell’operatore.");
       return;
     }
 
@@ -1595,7 +1679,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile creare l’operatore.");
+      showToast("Non è stato possibile creare l’operatore.");
       return;
     }
 
@@ -1606,14 +1690,14 @@ return validShops;
     await loadOperators();
     await loadAdminOperators();
 
-    alert("Operatore aggiunto.");
+    showToast("Operatore aggiunto.");
   }
 
   async function saveAdminOperator(item) {
     const cleanName = String(item.name || "").trim();
 
     if (!cleanName) {
-      alert("Il nome dell’operatore non può essere vuoto.");
+      showToast("Il nome dell’operatore non può essere vuoto.");
       return;
     }
 
@@ -1635,7 +1719,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile salvare l’operatore.");
+      showToast("Non è stato possibile salvare l’operatore.");
       return;
     }
 
@@ -1644,12 +1728,13 @@ return validShops;
     await loadBookings();
     await loadAdminBookings();
 
-    alert("Operatore aggiornato.");
+    showToast("Operatore aggiornato.");
   }
 
   async function deleteAdminOperator(item) {
-    const confirmDelete = window.confirm(
-      "Vuoi eliminare questo operatore? Se ha prenotazioni già associate, è meglio disattivarlo invece di eliminarlo."
+    const confirmDelete = await showConfirm(
+      "Vuoi eliminare questo operatore?\n\nSe ha prenotazioni già associate, è meglio disattivarlo invece di eliminarlo.",
+      true
     );
 
     if (!confirmDelete) return;
@@ -1666,14 +1751,14 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare l’operatore. Se ha prenotazioni associate, disattivalo invece di eliminarlo.");
+      showToast("Non è stato possibile eliminare l’operatore. Se ha prenotazioni associate, disattivalo invece di eliminarlo.");
       return;
     }
 
     await loadOperators();
     await loadAdminOperators();
 
-    alert("Operatore eliminato.");
+    showToast("Operatore eliminato.");
   }
 
   async function uploadAdminHomeImage(item, file) {
@@ -1694,7 +1779,7 @@ return validShops;
 
     if (uploadError) {
       console.error(uploadError);
-      alert("Non è stato possibile caricare la foto.");
+      showToast("Non è stato possibile caricare la foto.");
       setUploadingImageId("");
       return;
     }
@@ -1715,7 +1800,7 @@ return validShops;
 
     if (updateError) {
       console.error(updateError);
-      alert("Foto caricata, ma non è stato possibile collegarla alla Home.");
+      showToast("Foto caricata, ma non è stato possibile collegarla alla Home.");
       setUploadingImageId("");
       return;
     }
@@ -1724,7 +1809,7 @@ return validShops;
     await loadAdminImages();
 
     setUploadingImageId("");
-    alert("Foto caricata correttamente.");
+    showToast("Foto caricata correttamente.");
   }
 
   async function uploadAdminOperatorImage(item, file) {
@@ -1745,7 +1830,7 @@ return validShops;
 
     if (uploadError) {
       console.error(uploadError);
-      alert("Non è stato possibile caricare la foto dell’operatore.");
+      showToast("Non è stato possibile caricare la foto dell’operatore.");
       setOperatorSavingId("");
       return;
     }
@@ -1766,7 +1851,7 @@ return validShops;
 
     if (updateError) {
       console.error(updateError);
-      alert("Foto caricata, ma non è stato possibile collegarla all’operatore.");
+      showToast("Foto caricata, ma non è stato possibile collegarla all’operatore.");
       setOperatorSavingId("");
       return;
     }
@@ -1777,7 +1862,7 @@ return validShops;
     await loadAdminBookings();
 
     setOperatorSavingId("");
-    alert("Foto operatore aggiornata.");
+    showToast("Foto operatore aggiornata.");
   }
 
   async function loadHomeImages() {
@@ -1820,8 +1905,9 @@ return validShops;
     setServicesLoading(false);
     setShopDataLoading(false);
     if (error) {
-      alert("Errore nel caricamento dei servizi");
+      showToast("Errore nel caricamento dei servizi");
       console.error(error);
+      setLoadedShopId(requestedShopId);
       return;
     }
 
@@ -1866,7 +1952,7 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Errore nel caricamento delle disponibilità del salone.");
+      showToast("Errore nel caricamento delle disponibilità del salone.");
       return;
     }
 
@@ -1879,58 +1965,91 @@ return validShops;
     if (availabilitySubmitLockRef.current || availabilitySaving) return;
 
     if (!session?.user || !isAdmin) {
-      alert("Solo un admin può modificare le disponibilità.");
+      showToast("Solo un admin può modificare le disponibilità.");
       return;
     }
 
+    const isMultiDay = availabilityMode === "multi_day";
     const isRecurring = availabilityMode.startsWith("recurring");
-    const isFullDay = availabilityMode.endsWith("full_day");
+    const isFullDay = availabilityMode.endsWith("full_day") || isMultiDay;
     const cleanReason = availabilityReason.trim();
 
-    if (!isRecurring && !availabilityDate) {
-      alert("Scegli il giorno da bloccare.");
+    if (isMultiDay) {
+      if (!availabilityDate || !availabilityDateTo) {
+        showToast("Scegli la data di inizio e la data di fine.");
+        return;
+      }
+      if (availabilityDateTo < availabilityDate) {
+        showToast("La data di fine deve essere successiva alla data di inizio.");
+        return;
+      }
+    } else if (!isRecurring && !availabilityDate) {
+      showToast("Scegli il giorno da bloccare.");
       return;
     }
 
     if (!isFullDay && (!availabilityStartTime || !availabilityEndTime)) {
-      alert("Scegli orario di inizio e fine.");
+      showToast("Scegli orario di inizio e fine.");
       return;
     }
 
     if (!isFullDay && timeToMinutes(availabilityStartTime) >= timeToMinutes(availabilityEndTime)) {
-      alert("L’orario di fine deve essere successivo all’orario di inizio.");
+      showToast("L’orario di fine deve essere successivo all’orario di inizio.");
       return;
     }
 
     availabilitySubmitLockRef.current = true;
     setAvailabilitySaving(true);
 
-    const payload = {
-      shop_id: activeShopId,
-      block_date: isRecurring ? null : availabilityDate,
-      weekday: isRecurring ? Number(availabilityWeekday) : null,
-      start_time: isFullDay ? null : availabilityStartTime,
-      end_time: isFullDay ? null : availabilityEndTime,
-      full_day: isFullDay,
-      recurring: isRecurring,
-      active: true,
-      reason: cleanReason || null,
-      created_by: session.user.id,
-    };
+    let payloads = [];
+
+    if (isMultiDay) {
+      const start = new Date(availabilityDate + "T00:00:00");
+      const end = new Date(availabilityDateTo + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        payloads.push({
+          shop_id: activeShopId,
+          block_date: dateStr,
+          weekday: null,
+          start_time: null,
+          end_time: null,
+          full_day: true,
+          recurring: false,
+          active: true,
+          reason: cleanReason || null,
+          created_by: session.user.id,
+        });
+      }
+    } else {
+      payloads = [{
+        shop_id: activeShopId,
+        block_date: isRecurring ? null : availabilityDate,
+        weekday: isRecurring ? Number(availabilityWeekday) : null,
+        start_time: isFullDay ? null : availabilityStartTime,
+        end_time: isFullDay ? null : availabilityEndTime,
+        full_day: isFullDay,
+        recurring: isRecurring,
+        active: true,
+        reason: cleanReason || null,
+        created_by: session.user.id,
+      }];
+    }
 
     const { error } = await supabase
       .from("availability_blocks")
-      .insert([payload]);
+      .insert(payloads);
 
     if (error) {
       availabilitySubmitLockRef.current = false;
       setAvailabilitySaving(false);
       console.error(error);
-      alert("Non è stato possibile salvare la chiusura.");
+      showToast("Non è stato possibile salvare la chiusura.");
       return;
     }
 
     setAvailabilityDate("");
+    setAvailabilityDateTo("");
     setAvailabilityStartTime("");
     setAvailabilityEndTime("");
     setAvailabilityReason("");
@@ -1944,7 +2063,7 @@ return validShops;
 
     availabilitySubmitLockRef.current = false;
     setAvailabilitySaving(false);
-    alert("Disponibilità aggiornata.");
+    showToast("Disponibilità aggiornata.");
   }
 
   async function createExceptionalOpening(e) {
@@ -1953,24 +2072,24 @@ return validShops;
     if (openingSubmitLockRef.current || openingSaving) return;
 
     if (!session?.user || !isAdmin) {
-      alert("Solo un admin può creare aperture eccezionali.");
+      showToast("Solo un admin può creare aperture eccezionali.");
       return;
     }
 
     const cleanReason = openingReason.trim();
 
     if (!openingDate) {
-      alert("Scegli il giorno da aprire eccezionalmente.");
+      showToast("Scegli il giorno da aprire eccezionalmente.");
       return;
     }
 
     if (!openingStartTime || !openingEndTime) {
-      alert("Scegli orario di apertura e chiusura.");
+      showToast("Scegli orario di apertura e chiusura.");
       return;
     }
 
     if (timeToMinutes(openingStartTime) >= timeToMinutes(openingEndTime)) {
-      alert("L’orario di fine deve essere successivo all’orario di inizio.");
+      showToast("L’orario di fine deve essere successivo all’orario di inizio.");
       return;
     }
 
@@ -1998,7 +2117,7 @@ return validShops;
       openingSubmitLockRef.current = false;
       setOpeningSaving(false);
       console.error(error);
-      alert("Non è stato possibile salvare l’apertura eccezionale.");
+      showToast("Non è stato possibile salvare l’apertura eccezionale.");
       return;
     }
 
@@ -2016,36 +2135,43 @@ return validShops;
 
     openingSubmitLockRef.current = false;
     setOpeningSaving(false);
-    alert("Apertura eccezionale salvata.");
+    showToast("Apertura eccezionale salvata.");
   }
 
-  async function deleteAvailabilityBlock(block) {
-    const confirmDelete = window.confirm(
-      isExceptionalOpeningBlock(block)
+  async function deleteAvailabilityBlock(blockOrGroup) {
+    const blocks = blockOrGroup.blocks || [blockOrGroup];
+    const isOpening = blocks.every((b) => isExceptionalOpeningBlock(b));
+    const isGroup = blocks.length > 1;
+
+    const confirmDelete = await showConfirm(
+      isOpening
         ? "Vuoi rimuovere questa apertura eccezionale?"
-        : "Vuoi rimuovere questa chiusura?"
+        : isGroup
+          ? `Vuoi rimuovere questo periodo di chiusura? Verranno eliminati ${blocks.length} giorni.`
+          : "Vuoi rimuovere questa chiusura?"
     );
 
     if (!confirmDelete) return;
 
-    setAvailabilityDeletingId(block.id);
+    setAvailabilityDeletingId(blocks[0].id);
 
+    const ids = blocks.map((b) => b.id);
     const { error } = await supabase
       .from("availability_blocks")
       .delete()
-      .eq("id", block.id)
+      .in("id", ids)
       .eq("shop_id", activeShopId);
 
     setAvailabilityDeletingId("");
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare questa disponibilità.");
+      showToast("Non è stato possibile eliminare questa disponibilità.");
       return;
     }
 
     await loadAvailabilityBlocks();
-    alert(isExceptionalOpeningBlock(block) ? "Apertura eccezionale rimossa." : "Chiusura rimossa.");
+    showToast(isOpening ? "Apertura eccezionale rimossa." : "Chiusura rimossa.");
   }
 
   async function loadBookings() {
@@ -2058,7 +2184,7 @@ return validShops;
       .order("time", { ascending: true });
 
     if (error) {
-      alert("Errore nel caricamento degli orari");
+      showToast("Errore nel caricamento degli orari");
       console.error(error);
       return;
     }
@@ -2082,7 +2208,7 @@ return validShops;
       .order("time", { ascending: true });
 
     if (error) {
-      alert("Errore nel caricamento delle tue prenotazioni");
+      showToast("Errore nel caricamento delle tue prenotazioni");
       console.error(error);
       return;
     }
@@ -2094,12 +2220,12 @@ return validShops;
     const cleanEmail = authEmail.trim();
 
     if (!cleanEmail) {
-      alert("Inserisci prima la tua email nel campo Email.");
+      showToast("Inserisci prima la tua email nel campo Email.");
       return;
     }
 
     if (!isEmailProbablyValid(cleanEmail)) {
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
+      showToast("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
       return;
     }
 
@@ -2118,11 +2244,11 @@ return validShops;
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile inviare l’email di recupero password.");
+      showToast("Non è stato possibile inviare l’email di recupero password.");
       return;
     }
 
-    alert("Ti abbiamo inviato un’email per reimpostare la password.");
+    showToast("Ti abbiamo inviato un’email per reimpostare la password.");
   }
 
   async function handleAuth(e) {
@@ -2140,7 +2266,7 @@ return validShops;
     if (!isEmailProbablyValid(cleanEmail)) {
       authSubmitLockRef.current = false;
       setAuthLoading(false);
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
+      showToast("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
       return;
     }
 
@@ -2153,7 +2279,7 @@ return validShops;
       if (error) {
         authSubmitLockRef.current = false;
         setAuthLoading(false);
-        alert("Accesso non riuscito. Controlla email e password.");
+        showToast("Accesso non riuscito. Controlla email e password.");
         console.error(error);
         return;
       }
@@ -2184,7 +2310,14 @@ await loadLinkedShops(data.user.id);
     if (!cleanName || !cleanPhone) {
       authSubmitLockRef.current = false;
       setAuthLoading(false);
-      alert("Inserisci nome e telefono per completare la registrazione.");
+      showToast("Inserisci nome e telefono per completare la registrazione.");
+      return;
+    }
+
+    if (!isPhoneValid(cleanPhone)) {
+      authSubmitLockRef.current = false;
+      setAuthLoading(false);
+      showToast("Inserisci un numero di telefono valido.");
       return;
     }
 
@@ -2211,7 +2344,7 @@ await loadLinkedShops(data.user.id);
         return;
       }
 
-      alert("Account già riconosciuto. Accesso effettuato.");
+      showToast("Account già riconosciuto. Accesso effettuato.");
       return;
     }
 
@@ -2230,7 +2363,7 @@ await loadLinkedShops(data.user.id);
       authSubmitLockRef.current = false;
       setAuthLoading(false);
       console.error(signUpError);
-      alert("Non è stato possibile completare l’accesso. Se hai già un account, usa la scheda Accedi.");
+      showToast("Non è stato possibile completare l’accesso. Se hai già un account, usa la scheda Accedi.");
       return;
     }
 
@@ -2248,13 +2381,13 @@ await loadLinkedShops(data.user.id);
 
       authSubmitLockRef.current = false;
       setAuthLoading(false);
-      alert("Registrazione completata.");
+      showToast("Registrazione completata.");
       return;
     }
 
     authSubmitLockRef.current = false;
     setAuthLoading(false);
-    alert("Registrazione completata. Controlla la tua email se è richiesta la conferma.");
+    showToast("Registrazione completata. Controlla la tua email se è richiesta la conferma.");
     setAuthMode("login");
   }
 
@@ -2262,7 +2395,7 @@ await loadLinkedShops(data.user.id);
     e.preventDefault();
 
     if (!session?.user) {
-      alert("Devi essere connesso per modificare le credenziali.");
+      showToast("Devi essere connesso per modificare le credenziali.");
       return;
     }
 
@@ -2270,12 +2403,17 @@ await loadLinkedShops(data.user.id);
     const cleanPhone = newPhone.trim();
 
     if (!cleanFullName || !cleanPhone) {
-      alert("Inserisci nome e telefono.");
+      showToast("Inserisci nome e telefono.");
+      return;
+    }
+
+    if (!isPhoneValid(cleanPhone)) {
+      showToast("Inserisci un numero di telefono valido.");
       return;
     }
 
     if (!isEmailProbablyValid(newEmail.trim() || session.user.email)) {
-      alert("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
+      showToast("Controlla l’indirizzo email. Potrebbe esserci un errore nel dominio.");
       return;
     }
 
@@ -2297,7 +2435,7 @@ await loadLinkedShops(data.user.id);
       if (error) {
         setCredentialsLoading(false);
         console.error(error);
-        alert("Non è stato possibile aggiornare le credenziali.");
+        showToast("Non è stato possibile aggiornare le credenziali.");
         return;
       }
     }
@@ -2313,25 +2451,27 @@ await loadLinkedShops(data.user.id);
 
     if (!savedProfile) return;
 
-    alert("Profilo e credenziali aggiornati correttamente. Se hai cambiato email, potrebbe essere richiesta una conferma.");
+    showToast("Profilo e credenziali aggiornati correttamente. Se hai cambiato email, potrebbe essere richiesta una conferma.");
     setShowCredentialsModal(false);
     setNewPassword("");
   }
 
   async function deleteAccount() {
     if (!session?.user) {
-      alert("Devi essere connesso per cancellare l’account.");
+      showToast("Devi essere connesso per cancellare l’account.");
       return;
     }
 
-    const firstConfirm = window.confirm(
-      "Questa operazione eliminerà definitivamente il tuo account e i dati associati da tutte le applicazioni collegate alla piattaforma. Se vuoi solo uscire dall’app, usa Logout. Vuoi continuare?"
+    const firstConfirm = await showConfirm(
+      "Questa operazione eliminerà definitivamente il tuo account e tutti i dati associati.\n\nSe vuoi solo uscire dall’app, usa Logout.",
+      true
     );
 
     if (!firstConfirm) return;
 
-    const secondConfirm = window.confirm(
-      "Conferma finale: la cancellazione non può essere annullata. Verranno eliminati account, prenotazioni e collegamenti ai saloni."
+    const secondConfirm = await showConfirm(
+      "Sei sicuro? La cancellazione non può essere annullata.\n\nVerranno eliminati account, prenotazioni e collegamenti ai saloni.",
+      true
     );
 
     if (!secondConfirm) return;
@@ -2344,11 +2484,12 @@ await loadLinkedShops(data.user.id);
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare l’account.");
+      showToast("Non è stato possibile eliminare l’account.");
       return;
     }
 
-    alert("Account eliminato correttamente.");
+    showToast("Account eliminato correttamente.");
+    await supabase.auth.signOut();
     window.location.reload();
   }
 
@@ -2382,7 +2523,7 @@ await loadLinkedShops(data.user.id);
     if (!session?.user) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Per prenotare devi prima accedere o creare un account.");
+      showToast("Per prenotare devi prima accedere o creare un account.");
       setActivePage("account");
       return;
     }
@@ -2403,7 +2544,7 @@ await loadLinkedShops(data.user.id);
     if (!profileName || !profilePhone) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Per prenotare mancano nome o telefono nel tuo profilo. Apri il menu in alto a destra, entra in Cambia credenziali e completa nome e telefono.");
+      showToast("Per prenotare mancano nome o telefono nel tuo profilo. Apri il menu in alto a destra, entra in Cambia credenziali e completa nome e telefono.");
       setActivePage("home");
       return;
     }
@@ -2411,25 +2552,38 @@ await loadLinkedShops(data.user.id);
     if (!selectedOperator) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Scegli l’operatore con cui vuoi prenotare.");
+      showToast("Scegli l’operatore con cui vuoi prenotare.");
       return;
     }
 
     if (!date || !time || !availableSlots.includes(time)) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Questo giorno o orario non è disponibile. Scegli un altro slot.");
+      showToast("Questo giorno o orario non è disponibile. Scegli un altro slot.");
       await loadAvailabilityBlocks();
       await loadBookings();
       return;
     }
 
-    const alreadyBooked = isOperatorBookedAtSlot(bookings, date, time, selectedOperator.id);
+    const { data: freshBookings, error: freshBookingsError } = await supabase
+      .from("bookings")
+      .select("date,time,operator_id")
+      .eq("shop_id", activeShopId)
+      .eq("date", date);
+
+    if (freshBookingsError) {
+      bookingSubmitLockRef.current = false;
+      setLoading(false);
+      showToast("Errore di connessione. Riprova.");
+      return;
+    }
+
+    const alreadyBooked = isOperatorBookedAtSlot(freshBookings || [], date, time, selectedOperator.id);
 
     if (alreadyBooked) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Questo operatore non è più disponibile in questo orario. Scegli un altro orario o un altro operatore.");
+      showToast("Questo operatore non è più disponibile in questo orario. Scegli un altro orario o un altro operatore.");
       await loadBookings();
       return;
     }
@@ -2444,7 +2598,7 @@ await loadLinkedShops(data.user.id);
       bookingSubmitLockRef.current = false;
       setLoading(false);
       console.error(freshAvailabilityError);
-      alert("Non è stato possibile verificare le disponibilità aggiornate del salone.");
+      showToast("Non è stato possibile verificare le disponibilità aggiornate del salone.");
       return;
     }
 
@@ -2474,7 +2628,7 @@ await loadLinkedShops(data.user.id);
       setTime("");
       await loadAvailabilityBlocks();
       await loadBookings();
-      alert("Questo giorno o orario non è disponibile perché il salone risulta chiuso o lo slot non è prenotabile.");
+      showToast("Questo giorno o orario non è disponibile perché il salone risulta chiuso o lo slot non è prenotabile.");
       return;
     }
 
@@ -2499,7 +2653,7 @@ await loadLinkedShops(data.user.id);
     if (error) {
       bookingSubmitLockRef.current = false;
       setLoading(false);
-      alert("Non è stato possibile confermare la prenotazione.");
+      showToast("Non è stato possibile confermare la prenotazione.");
       console.error(error);
       return;
     }
@@ -2518,11 +2672,11 @@ await loadLinkedShops(data.user.id);
 
     bookingSubmitLockRef.current = false;
     setLoading(false);
-    alert("Prenotazione confermata!");
+    showToast("Prenotazione confermata!");
     setActivePage("my-bookings");
   }
 
-  async function createManualBooking(e) {
+  async function createManualBooking(e, overrideDate, overrideTime) {
     e.preventDefault();
 
     if (manualBookingSubmitLockRef.current || manualBookingLoading) return;
@@ -2530,32 +2684,52 @@ await loadLinkedShops(data.user.id);
     const cleanName = manualName.trim();
     const cleanPhone = manualPhone.trim();
     const cleanService = manualService.trim() || "Prenotazione telefonica";
+    const effectiveDate = overrideDate || manualDate;
+    const effectiveTime = overrideTime || manualTime;
 
-    if (!cleanName || !cleanPhone || !manualDate || !manualTime || !selectedManualOperator) {
-      alert("Inserisci almeno nome, telefono, operatore, giorno e ora.");
+    if (!cleanName || !cleanPhone || !effectiveDate || !effectiveTime || !selectedManualOperator) {
+      showToast("Inserisci almeno nome, telefono, operatore, giorno e ora.");
+      return;
+    }
+
+    if (!isPhoneValid(cleanPhone)) {
+      showToast("Inserisci un numero di telefono valido.");
       return;
     }
 
     manualBookingSubmitLockRef.current = true;
     setManualBookingLoading(true);
 
-    const alreadyBooked = isOperatorBookedAtSlot(bookings, manualDate, manualTime, selectedManualOperator.id);
+    const { data: freshAdminBookings, error: freshAdminBookingsError } = await supabase
+      .from("bookings")
+      .select("date,time,operator_id")
+      .eq("shop_id", activeShopId)
+      .eq("date", effectiveDate);
+
+    if (freshAdminBookingsError) {
+      manualBookingSubmitLockRef.current = false;
+      setManualBookingLoading(false);
+      showToast("Errore di connessione. Riprova.");
+      return;
+    }
+
+    const alreadyBooked = isOperatorBookedAtSlot(freshAdminBookings || [], effectiveDate, effectiveTime, selectedManualOperator.id);
 
     if (alreadyBooked) {
       manualBookingSubmitLockRef.current = false;
       setManualBookingLoading(false);
-      alert("Questo operatore risulta già occupato in questo orario. Aggiorna l’agenda o scegli un altro orario.");
+      showToast("Questo operatore risulta già occupato in questo orario. Aggiorna l’agenda o scegli un altro orario.");
       await loadBookings();
       await loadAdminBookings();
       return;
     }
 
-    const blockedByAvailability = isSlotBlockedByAvailability(manualTime, manualDate, availabilityBlocks);
+    const blockedByAvailability = isSlotBlockedByAvailability(effectiveTime, effectiveDate, availabilityBlocks);
 
     if (blockedByAvailability) {
       manualBookingSubmitLockRef.current = false;
       setManualBookingLoading(false);
-      alert("Questo orario risulta bloccato nelle disponibilità del salone.");
+      showToast("Questo orario risulta bloccato nelle disponibilità del salone.");
       await loadAvailabilityBlocks();
       return;
     }
@@ -2563,8 +2737,8 @@ await loadLinkedShops(data.user.id);
     const { error } = await supabase.from("bookings").insert([
       {
         service: cleanService,
-        date: manualDate,
-        time: manualTime,
+        date: effectiveDate,
+        time: effectiveTime,
         name: cleanName,
         phone: cleanPhone,
         operator_id: selectedManualOperator.id,
@@ -2579,7 +2753,7 @@ await loadLinkedShops(data.user.id);
       manualBookingSubmitLockRef.current = false;
       setManualBookingLoading(false);
       console.error(error);
-      alert("Non è stato possibile aggiungere la prenotazione manuale.");
+      showToast("Non è stato possibile aggiungere la prenotazione manuale.");
       return;
     }
 
@@ -2622,11 +2796,11 @@ await loadLinkedShops(data.user.id);
 
     manualBookingSubmitLockRef.current = false;
     setManualBookingLoading(false);
-    alert("Prenotazione aggiunta in agenda.");
+    showToast("Prenotazione aggiunta in agenda.");
   }
 
   async function deleteBooking(id) {
-    const confirmDelete = window.confirm("Vuoi cancellare questa prenotazione?");
+    const confirmDelete = await showConfirm("Vuoi cancellare questa prenotazione?", true);
     if (!confirmDelete) return;
 
     const { error } = await supabase
@@ -2637,7 +2811,7 @@ await loadLinkedShops(data.user.id);
       .eq("shop_id", activeShopId);
 
     if (error) {
-      alert("Non è stato possibile cancellare la prenotazione.");
+      showToast("Non è stato possibile cancellare la prenotazione.");
       console.error(error);
       return;
     }
@@ -2649,7 +2823,7 @@ await loadLinkedShops(data.user.id);
       await loadAdminBookings();
     }
 
-    alert("Prenotazione cancellata.");
+    showToast("Prenotazione cancellata.");
   }
 
   async function confirmDeleteAdminBooking() {
@@ -2667,7 +2841,7 @@ await loadLinkedShops(data.user.id);
 
     if (error) {
       console.error(error);
-      alert("Non è stato possibile eliminare la prenotazione.");
+      showToast("Non è stato possibile eliminare la prenotazione.");
       return;
     }
 
@@ -2680,7 +2854,7 @@ await loadLinkedShops(data.user.id);
       await loadMyBookings(session.user.id);
     }
 
-    alert("Prenotazione eliminata.");
+    showToast("Prenotazione eliminata.");
   }
 
   function selectShop(shopId) {
@@ -2728,9 +2902,11 @@ await loadLinkedShops(data.user.id);
     currentShopId={currentShopId}
     setCurrentShopId={selectShop}
     setShopChoiceCompleted={setShopChoiceCompleted}
+    showConfirm={showConfirm}
+    showToast={showToast}
   />
 )}
-        
+
       {authReady && !session && (
   <AccountScreen
     setActivePage={setActivePage}
@@ -2867,6 +3043,8 @@ await loadLinkedShops(data.user.id);
                 availabilitySaving={availabilitySaving}
                 availabilityDate={availabilityDate}
                 setAvailabilityDate={setAvailabilityDate}
+                availabilityDateTo={availabilityDateTo}
+                setAvailabilityDateTo={setAvailabilityDateTo}
                 availabilityWeekday={availabilityWeekday}
                 setAvailabilityWeekday={setAvailabilityWeekday}
                 weekdays={weekdays}
@@ -2900,6 +3078,10 @@ await loadLinkedShops(data.user.id);
                 openingReason={openingReason}
                 setOpeningReason={setOpeningReason}
                 sortedExceptionalOpeningBlocks={sortedExceptionalOpeningBlocks}
+                showConfirm={showConfirm}
+                showToast={showToast}
+                availabilityDateTo={availabilityDateTo}
+                setAvailabilityDateTo={setAvailabilityDateTo}
               />
             )}
 
@@ -3018,6 +3200,21 @@ await loadLinkedShops(data.user.id);
           setShowPrivacyModal={setShowPrivacyModal}
         />
       )}
+
+      <ConfirmModal
+        open={confirmState.open}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={() => handleConfirmChoice(true)}
+        onCancel={() => handleConfirmChoice(false)}
+      />
+
+      <Toast
+        open={toastState.open}
+        message={toastState.message}
+        type={toastState.type}
+        onClose={() => setToastState((s) => ({ ...s, open: false }))}
+      />
 
       {showCredentialsModal && (
         <CredentialsModal

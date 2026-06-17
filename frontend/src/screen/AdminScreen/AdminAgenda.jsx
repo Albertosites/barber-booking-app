@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 
 function formatLocalDateKey(date) {
@@ -192,6 +192,27 @@ setSlotPopupPosition({
   const currentView = ["today", "week", "month"].includes(adminAgendaFilter)
     ? adminAgendaFilter
     : "today";
+
+  const currentSlotRef = useRef(null);
+
+  const currentTimeSlot = useMemo(() => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    const nowStr = `${hh}:${mm}`;
+    return slots.reduce((closest, slot) => {
+      if (slot <= nowStr) return slot;
+      return closest;
+    }, slots[0] || null);
+  }, [slots]);
+
+  useEffect(() => {
+    if (currentView === "today" && !selectedAgendaDay && currentSlotRef.current) {
+      setTimeout(() => {
+        currentSlotRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [currentView, selectedAgendaDay]);
 
   const visibleBookings = useMemo(() => {
     return filteredAdminBookings || [];
@@ -391,9 +412,12 @@ const slotBackground = isFullyBusy
           selectedFreeSlot.date === dayKey &&
           selectedFreeSlot.time === slot;
 
+        const isCurrentSlot = dayKey === todayKey && slot === currentTimeSlot;
+
         return (
           <div
             key={slot}
+            ref={isCurrentSlot ? currentSlotRef : null}
             style={{
               position: "relative",
             }}
@@ -701,17 +725,9 @@ maxWidth: "none",
       disabled={manualBookingLoading}
       onClick={(event) => {
         event.preventDefault();
-
         setManualDate(dayKey);
         setManualTime(slot);
-
-        setTimeout(() => {
-          const fakeEvent = {
-            preventDefault: () => {},
-          };
-
-          createManualBooking(fakeEvent);
-        }, 0);
+        createManualBooking(event, dayKey, slot);
       }}
     >
       {manualBookingLoading
@@ -899,17 +915,9 @@ maxWidth: "none",
       disabled={manualBookingLoading}
       onClick={(event) => {
         event.preventDefault();
-
         setManualDate(dayKey);
         setManualTime(slot);
-
-        setTimeout(() => {
-          const fakeEvent = {
-            preventDefault: () => {},
-          };
-
-          createManualBooking(fakeEvent);
-        }, 0);
+        createManualBooking(event, dayKey, slot);
       }}
     >
       {manualBookingLoading ? "Attendi..." : "Salva prenotazione"}
@@ -1232,112 +1240,6 @@ maxWidth: "none",
     );
   }
 
-  const slotBookingModal = selectedSlotBooking && (
-    <div
-      style={{
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.18)",
-  zIndex: 9999,
-  padding: 0,
-}}
-      onClick={() => setSelectedSlotBooking(null)}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-          borderRadius: "24px",
-          background: "#fff",
-          padding: "24px",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "14px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <span style={{ color: "#666", fontSize: "0.82rem" }}>
-              Appuntamento
-            </span>
-
-            <h3
-              style={{
-                margin: 0,
-                color: "#111",
-              }}
-            >
-              {selectedSlotBooking.time}
-            </h3>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSelectedSlotBooking(null)}
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: "1.3rem",
-              cursor: "pointer",
-              color: "#111",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div>
-          <strong style={{ color: "#111" }}>
-            {selectedSlotBooking.name}
-          </strong>
-
-          <p style={{ margin: "6px 0", color: "#444" }}>
-            {selectedSlotBooking.service || "Prenotazione"}
-          </p>
-
-          <p style={{ margin: "6px 0", color: "#444" }}>
-            Operatore:{" "}
-            {selectedSlotBooking.operator_name || "Non assegnato"}
-          </p>
-        </div>
-
-        <a
-          href={`tel:${selectedSlotBooking.phone}`}
-          style={{
-            textDecoration: "none",
-            background: "rgba(216,38,76,0.12)",
-            color: "#D8264C",
-            padding: "14px",
-            borderRadius: "14px",
-            textAlign: "center",
-            fontWeight: 600,
-          }}
-        >
-          {selectedSlotBooking.phone}
-        </a>
-
-        <button
-          className="admin-delete-booking-btn"
-          type="button"
-          onClick={() => {
-            setAdminBookingToDelete(selectedSlotBooking);
-            setSelectedSlotBooking(null);
-          }}
-        >
-          Elimina prenotazione
-        </button>
-      </div>
-    </div>
-  );
-
   const freeSlotModal = selectedFreeSlot && (
     <div
       style={{
@@ -1409,6 +1311,7 @@ maxWidth: "none",
   );
 
   return (
+    <>
     <div className="admin-panel">
       
 
@@ -1635,6 +1538,9 @@ maxWidth: "none",
 
       {currentView === "month" &&
         renderMonthView()}
+
     </div>
+
+    </>
   );
 }

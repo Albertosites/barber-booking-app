@@ -1,25 +1,28 @@
-import { supabase } from "../../supabaseClient";
+﻿import { supabase } from "../../supabaseClient";
 import { X } from "lucide-react";
 function ShopSelectScreen({
   linkedShops,
   currentShopId,
   setCurrentShopId,
   setShopChoiceCompleted,
+  showConfirm,
+  showToast,
 }) {
 async function handleLeaveShop(shop) {
   if (shop.role === "admin") {
-  alert("Sei admin di questo salone. Non puoi rimuoverlo dal tuo account.");
-  return;
-}
-  
-  const firstConfirm = window.confirm(
+    showToast("Sei admin di questo salone. Non puoi rimuoverlo dal tuo account.");
+    return;
+  }
+
+  const firstConfirm = await showConfirm(
     `Vuoi davvero rimuovere "${shop.name}" dal tuo account?`
   );
 
   if (!firstConfirm) return;
 
-  const secondConfirm = window.confirm(
-    "Perderai l'accesso alle prenotazioni e ai dati di questo salone."
+  const secondConfirm = await showConfirm(
+    "Perderai l'accesso alle prenotazioni e ai dati di questo salone.",
+    true
   );
 
   if (!secondConfirm) return;
@@ -30,7 +33,7 @@ async function handleLeaveShop(shop) {
 
   if (error) {
     console.error(error);
-    alert("Non è stato possibile rimuovere il salone.");
+    showToast("Non è stato possibile rimuovere il salone.");
     return;
   }
 
