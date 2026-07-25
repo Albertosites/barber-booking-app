@@ -51,13 +51,13 @@ function InfoScreen({
           <p>Listino aggiornato dal salone</p>
         </div>
 
-        <div className="mosaic-card wide dark">
+        <a className="mosaic-card wide dark" href={`tel:${shopSettings.phone}`} style={{ textDecoration: "none", display: "flex", gap: "12px", alignItems: "center" }}>
           <span><Phone size={24} strokeWidth={2.2} /></span>
           <div>
             <strong>{shopSettings.phone}</strong>
-            <p>Contatto diretto del salone</p>
+            <p>Tocca per chiamare</p>
           </div>
-        </div>
+        </a>
       </div>
     </section>
   );

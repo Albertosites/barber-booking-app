@@ -29,16 +29,16 @@ function BookingForm({
 
   return (
     <form className="booking-form" onSubmit={handleSubmit}>
-      <div className="section-title">
-    
-      </div>
-
       {servicesLoading ? (
         <div className="empty-card compact">
           <strong>Caricamento servizi</strong>
           <p>Stiamo recuperando i servizi aggiornati del salone.</p>
         </div>
       ) : (
+        <>
+        <div className="section-title operator-section-title">
+          <h3>Scegli servizio</h3>
+        </div>
         <div className="booking-service-groups">
           {serviceCategories.map((group) => {
             const isOpen = openCategory === group.category;
@@ -117,6 +117,7 @@ function BookingForm({
             );
           })}
         </div>
+        </>
       )}
 
       <input type="hidden" value={service} required />

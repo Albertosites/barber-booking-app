@@ -28,6 +28,7 @@ function BottomNav({
         onClick={() => {
           setShowProfileMenu(false);
           setActivePage("book");
+          setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
         }}
       >
         <CalendarPlus size={18} strokeWidth={2.4} />

@@ -7,8 +7,8 @@ function BookingHeader({
         ←
       </button>
       <div>
-        <span className="eyebrow">Prenotazione</span>
-        <h1>Scegli il servizio</h1>
+        <span className="eyebrow">Salone</span>
+        <h1>Prenotazione</h1>
       </div>
     </header>
   );
