@@ -1,4 +1,5 @@
-import { CalendarDays, Scissors, Ban, BadgePercent } from "lucide-react";
+import { CalendarDays, Scissors, Ban, BadgePercent, UserCircle2 } from "lucide-react";
+import { useRef } from "react";
 
 function AdminScreen({
   setActivePage,
@@ -6,18 +7,29 @@ function AdminScreen({
   setAdminTab,
   loadAdminBookings,
   loadAvailabilityBlocks,
+  setShowProfileMenu,
   children,
 }) {
+  const contentRef = useRef(null);
+
+  function switchTab(tab, extra) {
+    setAdminTab(tab);
+    if (extra) extra();
+    setTimeout(() => {
+      contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   return (
     <section className="screen">
       <header className="page-header">
-        <button className="back-btn" onClick={() => setActivePage("home")}>
-          ←
-        </button>
         <div>
           <span className="eyebrow">Admin</span>
           <h1>Area Barbiere</h1>
         </div>
+        <button className="back-btn" onClick={() => setShowProfileMenu(true)} style={{ marginLeft: "auto" }}>
+          <UserCircle2 size={26} strokeWidth={1.8} />
+        </button>
       </header>
 
       <div className="admin-intro-card admin-agenda-intro">
@@ -44,10 +56,7 @@ function AdminScreen({
         <button
           type="button"
           className={adminTab === "agenda" ? "folder-card active" : "folder-card"}
-          onClick={() => {
-            setAdminTab("agenda");
-            loadAdminBookings();
-          }}
+          onClick={() => switchTab("agenda", loadAdminBookings)}
         >
           <CalendarDays size={28} strokeWidth={2.2} />
           <strong>Agenda</strong>
@@ -57,7 +66,7 @@ function AdminScreen({
         <button
           type="button"
           className={adminTab === "content" ? "folder-card active" : "folder-card"}
-          onClick={() => setAdminTab("content")}
+          onClick={() => switchTab("content")}
         >
           <Scissors size={28} strokeWidth={2.2} />
           <strong>Gestione</strong>
@@ -67,10 +76,7 @@ function AdminScreen({
         <button
           type="button"
           className={adminTab === "availability" ? "folder-card active" : "folder-card"}
-          onClick={() => {
-            setAdminTab("availability");
-            loadAvailabilityBlocks();
-          }}
+          onClick={() => switchTab("availability", loadAvailabilityBlocks)}
         >
           <Ban size={28} strokeWidth={2.2} />
           <strong>Disponibilità</strong>
@@ -80,7 +86,7 @@ function AdminScreen({
         <button
           type="button"
           className={adminTab === "offers" ? "folder-card active" : "folder-card"}
-          onClick={() => setAdminTab("offers")}
+          onClick={() => switchTab("offers")}
         >
           <BadgePercent size={28} strokeWidth={2.2} />
           <strong>Offerte</strong>
@@ -88,7 +94,9 @@ function AdminScreen({
         </button>
       </div>
 
-      {children}
+      <div ref={contentRef}>
+        {children}
+      </div>
     </section>
   );
 }

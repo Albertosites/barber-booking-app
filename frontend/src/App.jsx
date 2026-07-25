@@ -1069,7 +1069,11 @@ async function saveShopOpeningSettings(payload) {
       return;
     }
 
-    setIsAdmin(data?.role === "admin");
+    const adminResult = data?.role === "admin";
+    setIsAdmin(adminResult);
+    if (adminResult) {
+      setActivePage("admin");
+    }
   }
 
  async function loadLinkedShops(userId) {
@@ -3022,6 +3026,7 @@ await loadLinkedShops(data.user.id);
             setAdminTab={setAdminTab}
             loadAdminBookings={loadAdminBookings}
             loadAvailabilityBlocks={loadAvailabilityBlocks}
+            setShowProfileMenu={setShowProfileMenu}
           >
             {adminLoading && (
               <div className="empty-card compact">
@@ -3233,7 +3238,7 @@ await loadLinkedShops(data.user.id);
         />
       )}
 
-      {canEnterShop && (
+      {canEnterShop && !isAdmin && (
   <BottomNav
     activePage={activePage}
     setActivePage={setActivePage}

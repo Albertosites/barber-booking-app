@@ -194,6 +194,7 @@ setSlotPopupPosition({
     : "today";
 
   const currentSlotRef = useRef(null);
+  const agendaContentRef = useRef(null);
 
   const currentTimeSlot = useMemo(() => {
     const now = new Date();
@@ -240,12 +241,14 @@ setSlotPopupPosition({
     setSelectedSlotBooking(null);
     setSelectedFreeSlot(null);
     setAdminAgendaFilter(nextView);
+    setTimeout(() => {
+      agendaContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   function renderBackButton(label, onClick) {
     return (
       <button
-        className="filter-pill active"
         type="button"
         onClick={onClick}
         style={{
@@ -254,23 +257,20 @@ setSlotPopupPosition({
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          padding: "10px 16px",
+          padding: "10px 18px",
+          background: "#f5f5f5",
+          border: "1px solid #e0e0e0",
+          borderRadius: "999px",
+          cursor: "pointer",
+          fontSize: "14px",
+          fontWeight: 600,
           color: "#111",
         }}
       >
-        <span
-          style={{
-            fontSize: "18px",
-            lineHeight: 1,
-            color: "#111",
-          }}
-        >
-          ←
-        </span>
-
-        <span style={{ color: "#111" }}>
-          {label}
-        </span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        {label}
       </button>
     );
   }
@@ -1045,7 +1045,7 @@ maxWidth: "none",
 
       return renderWeekOverview(
         selectedWeek,
-        renderBackButton("Torna al mese", () => {
+        renderBackButton("Torna a questo mese", () => {
           setSelectedAgendaDay("");
           setSelectedAgendaWeekIndex(null);
         })
@@ -1333,158 +1333,8 @@ maxWidth: "none",
         </p>
       </div>
 
-      <button
-        className="primary-cta manual-booking-toggle"
-        type="button"
-        onClick={() =>
-          setShowManualBookingForm((current) => !current)
-        }
-        disabled={manualBookingLoading}
-      >
-        {showManualBookingForm
-          ? "Chiudi inserimento rapido"
-          : "Aggiungi prenotazione a nome di cliente"}
-      </button>
 
-      {showManualBookingForm && (
-        <form
-          className="manual-booking-form"
-          onSubmit={createManualBooking}
-        >
-          <div className="manual-booking-title">
-            <span>Telefonata / banco</span>
-
-            <strong>
-              Blocca uno slot in agenda
-            </strong>
-
-            <p>
-              Inserisci una nota interna o il servizio richiesto dal cliente.
-            </p>
-          </div>
-
-          <label>Nome cliente</label>
-
-          <input
-            type="text"
-            placeholder="Es. Marco Rossi"
-            value={manualName}
-            onChange={(e) => setManualName(e.target.value)}
-            disabled={manualBookingLoading}
-            required
-          />
-
-          <label>Telefono</label>
-
-          <input
-            type="tel"
-            placeholder="Es. 3331234567"
-            value={manualPhone}
-            onChange={(e) => setManualPhone(e.target.value)}
-            disabled={manualBookingLoading}
-            required
-          />
-
-          <label>Servizio o nota</label>
-
-          <input
-            type="text"
-            placeholder="Es. taglio, barba, sistemazione veloce..."
-            value={manualService}
-            onChange={(e) => setManualService(e.target.value)}
-            disabled={manualBookingLoading}
-          />
-
-          <label>Operatore</label>
-
-          <select
-            value={manualOperatorId}
-            onChange={(e) => {
-              setManualOperatorId(e.target.value);
-              setManualTime("");
-            }}
-            disabled={
-              manualBookingLoading ||
-              activeOperators.length === 0
-            }
-            required
-          >
-            <option value="">
-              {activeOperators.length > 0
-                ? "Scegli operatore"
-                : "Nessun operatore disponibile"}
-            </option>
-
-            {activeOperators.map((operator) => (
-              <option
-                key={operator.id}
-                value={operator.id}
-              >
-                {operator.name}
-                {operator.role
-                  ? ` · ${operator.role}`
-                  : ""}
-              </option>
-            ))}
-          </select>
-
-          <div className="admin-form-grid">
-            <div>
-              <label>Giorno</label>
-
-              <input
-                type="date"
-                value={manualDate}
-                min={todayKey}
-                onChange={(e) => {
-                  setManualDate(e.target.value);
-                  setManualTime("");
-                }}
-                disabled={manualBookingLoading}
-                required
-              />
-            </div>
-
-            <div>
-              <label>Ora</label>
-
-              <select
-                value={manualTime}
-                onChange={(e) => setManualTime(e.target.value)}
-                required
-                disabled={
-                  !manualDate || manualBookingLoading
-                }
-              >
-                <option value="">
-                  {manualDate ? "Scegli" : "Prima giorno"}
-                </option>
-
-                {manualAvailableSlots.map((slot) => (
-                  <option
-                    key={slot}
-                    value={slot}
-                  >
-                    {slot}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <button
-            className="primary-cta"
-            type="submit"
-            disabled={manualBookingLoading}
-          >
-            {manualBookingLoading
-              ? "Attendi..."
-              : "Aggiungi in agenda"}
-          </button>
-        </form>
-      )}
-
-      <div className="admin-filter-row">
+      <div ref={agendaContentRef} className="admin-filter-row">
         <button
           type="button"
           className={
