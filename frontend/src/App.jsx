@@ -493,17 +493,24 @@ function App() {
   function showToast(message, type) {
     if (!type) {
       const lower = String(message).toLowerCase();
-      if (lower.includes("non è stato possibile") || lower.includes("errore nel") || lower.startsWith("errore") || lower.includes("impossibile")) {
+      // Rosso: errori tecnici + eliminazioni/cancellazioni
+      if (
+        lower.includes("non è stato possibile") || lower.includes("errore nel") ||
+        lower.startsWith("errore") || lower.includes("impossibile") ||
+        lower.includes("non riuscit") || lower.includes("accesso non riuscito") ||
+        lower.includes("eliminat") || lower.includes("rimoss") || lower.includes("cancellat")
+      ) {
         type = "error";
+      // Verde: aggiunte, salvataggi, conferme
       } else if (
-        lower.includes("aggiornato") || lower.includes("eliminato") || lower.includes("creato") ||
-        lower.includes("confermata") || lower.includes("salvata") || lower.includes("aggiunto") ||
-        lower.includes("rimoss") || lower.includes("caricata") || lower.includes("completat") ||
+        lower.includes("aggiunto") || lower.includes("creato") || lower.includes("aggiornato") ||
+        lower.includes("aggiornata") || lower.includes("aggiornati") || lower.includes("confermata") ||
+        lower.includes("salvata") || lower.includes("caricata") || lower.includes("completat") ||
         lower.includes("inviato") || lower.includes("collegato") || lower.includes("correttamente") ||
-        lower.includes("aggiornati") || lower.includes("rimossa") || lower.includes("cancellata") ||
-        lower.includes("cancellato") || lower.includes("aggiornata")
+        lower.includes("operatore aggiunto") || lower.includes("foto") || lower.includes("prenotazione confermata")
       ) {
         type = "success";
+      // Giallo: validazioni e info neutre
       } else {
         type = "info";
       }
