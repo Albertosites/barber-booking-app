@@ -1,5 +1,6 @@
 import { CalendarDays, Scissors, Ban, BadgePercent, UserCircle2 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import ProfileMenu from "../../components/ProfileMenu";
 
 function AdminScreen({
   setActivePage,
@@ -7,10 +8,16 @@ function AdminScreen({
   setAdminTab,
   loadAdminBookings,
   loadAvailabilityBlocks,
-  setShowProfileMenu,
+  session,
+  deleteAccountLoading,
+  openCredentialsModal,
+  logout,
+  deleteAccount,
+  setShowPrivacyModal,
   children,
 }) {
   const contentRef = useRef(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   function switchTab(tab, extra) {
     setAdminTab(tab);
@@ -27,9 +34,23 @@ function AdminScreen({
           <span className="eyebrow">Admin</span>
           <h1>Area Barbiere</h1>
         </div>
-        <button className="back-btn" onClick={() => setShowProfileMenu(true)} style={{ marginLeft: "auto" }}>
-          <UserCircle2 size={26} strokeWidth={1.8} />
-        </button>
+        <div className="profile-wrapper" style={{ marginLeft: "auto" }}>
+          <button className="avatar profile-button" type="button" onClick={() => setShowProfileMenu((c) => !c)} aria-label="Apri profilo">
+            <UserCircle2 size={26} strokeWidth={1.8} />
+          </button>
+          {showProfileMenu && (
+            <ProfileMenu
+              session={session}
+              deleteAccountLoading={deleteAccountLoading}
+              setActivePage={setActivePage}
+              setShowProfileMenu={setShowProfileMenu}
+              setShowPrivacyModal={setShowPrivacyModal}
+              openCredentialsModal={openCredentialsModal}
+              logout={logout}
+              deleteAccount={deleteAccount}
+            />
+          )}
+        </div>
       </header>
 
       <div className="admin-intro-card admin-agenda-intro">

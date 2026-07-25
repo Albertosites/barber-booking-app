@@ -3026,7 +3026,12 @@ await loadLinkedShops(data.user.id);
             setAdminTab={setAdminTab}
             loadAdminBookings={loadAdminBookings}
             loadAvailabilityBlocks={loadAvailabilityBlocks}
-            setShowProfileMenu={setShowProfileMenu}
+            session={session}
+            deleteAccountLoading={deleteAccountLoading}
+            openCredentialsModal={openCredentialsModal}
+            logout={logout}
+            deleteAccount={deleteAccount}
+            setShowPrivacyModal={setShowPrivacyModal}
           >
             {adminLoading && (
               <div className="empty-card compact">
