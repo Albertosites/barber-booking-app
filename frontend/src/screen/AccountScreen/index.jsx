@@ -1,4 +1,5 @@
 import { LogIn, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 function AccountScreen({
   setActivePage,
@@ -20,6 +21,37 @@ function AccountScreen({
   setAuthPassword,
   resetPassword,
 }) {
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef(null);
+  const wasLoadingRef = useRef(false);
+
+  useEffect(() => {
+    if (authLoading) {
+      wasLoadingRef.current = true;
+      return;
+    }
+    if (wasLoadingRef.current && !session) {
+      wasLoadingRef.current = false;
+      setCooldown(5);
+      clearInterval(cooldownRef.current);
+      cooldownRef.current = setInterval(() => {
+        setCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      wasLoadingRef.current = false;
+    }
+  }, [authLoading, session]);
+
+  useEffect(() => {
+    return () => clearInterval(cooldownRef.current);
+  }, []);
+
   return (
     <section className="screen">
       <header className="page-header">
@@ -129,9 +161,11 @@ function AccountScreen({
             </button>
           )}
 
-          <button className="primary-cta" type="submit" disabled={authLoading}>
+          <button className="primary-cta" type="submit" disabled={authLoading || cooldown > 0}>
             {authLoading
               ? "Attendi..."
+              : cooldown > 0
+              ? `Riprova tra ${cooldown}s`
               : authMode === "login"
               ? "Accedi"
               : "Crea account"}

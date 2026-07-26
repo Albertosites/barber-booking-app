@@ -406,6 +406,7 @@ const defaultShopSettings = {
 
 function App() {
   const [shopSettings, setShopSettings] = useState(defaultShopSettings);
+  const [shopNotFound, setShopNotFound] = useState(false);
   const [activePage, setActivePage] = useState("home");
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [gallery, setGallery] = useState(fallbackGallery);
@@ -433,8 +434,7 @@ function App() {
   const selectedShopReady =
   canEnterShop &&
   !shopDataLoading &&
-  loadedShopId === activeShopId &&
-  serviceCategories.length > 0;
+  loadedShopId === activeShopId;
   const [availabilityTab, setAvailabilityTab] = useState("closures");
   const [adminAgendaFilter, setAdminAgendaFilter] = useState("all");
   const [adminServices, setAdminServices] = useState([]);
@@ -853,14 +853,16 @@ function App() {
 
   if (error) {
     console.error(error);
-    setShopSettings(defaultShopSettings);
+    setShopNotFound(true);
     return;
   }
 
   if (!data) {
-    setShopSettings(defaultShopSettings);
+    setShopNotFound(true);
     return;
   }
+
+  setShopNotFound(false);
 
   setShopSettings({
   ...defaultShopSettings,
@@ -1149,8 +1151,6 @@ return validShops;
 
   async function loadAdminData() {
     setAdminLoading(true);
-
-    await deleteOldBookings();
 
     await Promise.all([
       loadAdminServices(),
@@ -2188,7 +2188,7 @@ return validShops;
   async function loadBookings() {
     const { data, error } = await supabase
       .from("bookings")
-      .select("*")
+      .select("date,time,operator_id")
       .eq("shop_id", activeShopId)
       .gte("date", getTodayString())
       .order("date", { ascending: true })
@@ -2224,7 +2224,14 @@ return validShops;
       return;
     }
 
-    setMyBookings(data || []);
+    const todayString = getTodayString();
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+    const filtered = (data || []).filter((booking) => {
+      if (booking.date !== todayString) return true;
+      return timeToMinutes(booking.time) > nowMinutes;
+    });
+
+    setMyBookings(filtered);
   }
 
   async function resetPassword() {
@@ -2243,7 +2250,7 @@ return validShops;
     const redirectUrl =
       window.location.hostname === "localhost"
         ? window.location.origin
-        : "https://mellifluous-crepe-6f358d.netlify.app";
+        : "https://barber-booking-app-rho.vercel.app";
 
     setAuthLoading(true);
 
@@ -2940,7 +2947,19 @@ await loadLinkedShops(data.user.id);
     resetPassword={resetPassword}
   />
 )}
-  {selectedShopReady && activePage === "home" && (
+  {canEnterShop && shopNotFound && (
+    <section className="screen">
+      <div className="empty-card" style={{ margin: "40px 20px", textAlign: "center" }}>
+        <strong>Salone non disponibile</strong>
+        <p>Questo salone non esiste o non è più attivo. Contatta il supporto o scansiona di nuovo il QR code.</p>
+        <button className="primary-cta" style={{ marginTop: "16px" }} onClick={logout}>
+          Esci
+        </button>
+      </div>
+    </section>
+  )}
+
+  {selectedShopReady && !shopNotFound && activePage === "home" && (
   <HomeScreen
     shopSettings={shopSettings}
     shopAddressLine={shopAddressLine}
@@ -2966,7 +2985,7 @@ await loadLinkedShops(data.user.id);
   />
 )}
 
-           {selectedShopReady && activePage === "book" && (
+           {selectedShopReady && !shopNotFound && activePage === "book" && (
         <BookingScreen
             setActivePage={setActivePage}
             serviceCategories={serviceCategories}
@@ -2992,7 +3011,7 @@ await loadLinkedShops(data.user.id);
           />
         )}
 
-        {selectedShopReady && activePage === "my-bookings" && (
+        {selectedShopReady && !shopNotFound && activePage === "my-bookings" && (
           <MyBookingsScreen
             setActivePage={setActivePage}
             session={session}
@@ -3188,7 +3207,7 @@ await loadLinkedShops(data.user.id);
           </AdminScreen>
         )}
 
-        {selectedShopReady && activePage === "info" && (
+        {selectedShopReady && !shopNotFound && activePage === "info" && (
           <InfoScreen
             setActivePage={setActivePage}
             shopSettings={shopSettings}

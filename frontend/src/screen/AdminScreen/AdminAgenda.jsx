@@ -1327,7 +1327,6 @@ maxWidth: "none",
         <strong>Vista appuntamenti</strong>
 
         <p>
-          Le prenotazioni vecchie vengono eliminate automaticamente.
           Puoi controllare oggi, la settimana o il mese
           e aprire il singolo giorno.
         </p>
