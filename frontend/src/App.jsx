@@ -19,51 +19,20 @@ import BottomNav from "./components/BottomNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./supabaseClient";
+import {
+  timeToMinutes, getTodayString, formatDateHeader, formatLongDate,
+  isPhoneValid, isEmailProbablyValid, generateSlots,
+} from "./utils/dateUtils";
+import {
+  OPENING_REASON_PREFIX, isExceptionalOpeningBlock, getCleanAvailabilityReason,
+  hasExceptionalOpeningForDate, isSlotBlockedByAvailability,
+  isOperatorBookedAtSlot, hasAtLeastOneOperatorAvailableAtSlot,
+  formatAvailabilityBlockTitle, formatAvailabilityBlockTime,
+  getBookingAvailabilityNotice, getWeekdayLabel,
+} from "./utils/bookingUtils";
+import { useToast } from "./hooks/useToast";
+import { useConfirm } from "./hooks/useConfirm";
 
-
-const OPENING_REASON_PREFIX = "__EXCEPTIONAL_OPENING__:";
-
-function timeStringToMinutes(timeString) {
-  const cleanTime = String(timeString || "").slice(0, 5);
-  const [hours, minutes] = cleanTime.split(":").map(Number);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function minutesToTimeString(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-
-function generateSlots(openingTime, closingTime, slotMinutes = 30) {
-  const startMinutes = timeStringToMinutes(openingTime || "09:00");
-  const endMinutes = timeStringToMinutes(closingTime || "18:30");
-  const step = Number(slotMinutes || 30);
-
-  if (startMinutes === null || endMinutes === null || step <= 0) {
-    return [
-      "09:00", "09:30", "10:00", "10:30",
-      "11:00", "11:30", "12:00", "12:30",
-      "13:00", "13:30", "14:00", "14:30",
-      "15:00", "15:30", "16:00", "16:30",
-      "17:00", "17:30", "18:00", "18:30",
-    ];
-  }
-
-  const generatedSlots = [];
-
-  for (let current = startMinutes; current < endMinutes; current += step) {
-    generatedSlots.push(minutesToTimeString(current));
-  }
-
-  return generatedSlots;
-}
 
 const weekdays = [
   { value: 0, label: "Domenica" },
@@ -84,308 +53,6 @@ const fallbackGallery = [
   },
 ];
 
-function getTodayString() {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseLocalDate(dateString) {
-  if (!dateString || typeof dateString !== "string") return null;
-
-  const parts = dateString.split("-").map(Number);
-
-  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
-    return null;
-  }
-
-  return new Date(parts[0], parts[1] - 1, parts[2]);
-}
-
-function formatItalianDate(dateString, options = {}) {
-  const parsedDate = parseLocalDate(dateString);
-
-  if (!parsedDate) return dateString || "-";
-
-  return new Intl.DateTimeFormat("it-IT", options).format(parsedDate);
-}
-
-function formatDateHeader(dateString) {
-  const todayString = getTodayString();
-  const tomorrowDate = new Date();
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrowString = tomorrowDate.toISOString().slice(0, 10);
-
-  if (dateString === todayString) return "Oggi";
-  if (dateString === tomorrowString) return "Domani";
-
-  return formatItalianDate(dateString, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
-
-function formatLongDate(dateString) {
-  return formatItalianDate(dateString, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function isPhoneValid(phone) {
-  return /^[+\d\s\-().]{6,20}$/.test(phone.trim());
-}
-
-function isEmailProbablyValid(email) {
-  const cleanEmail = email.trim().toLowerCase();
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(cleanEmail)) {
-    return false;
-  }
-
-  const wrongEndings = [
-    ".con",
-    ".cim",
-    ".vom",
-    ".comm",
-    ".itn",
-    ".nett",
-    ".orrg",
-  ];
-
-  return !wrongEndings.some((ending) => cleanEmail.endsWith(ending));
-}
-
-function getWeekdayFromDate(dateString) {
-  const parsedDate = parseLocalDate(dateString);
-
-  if (!parsedDate) return null;
-
-  return parsedDate.getDay();
-}
-
-function getWeekdayLabel(weekday) {
-  const found = weekdays.find((item) => item.value === Number(weekday));
-
-  return found?.label || "Giorno";
-}
-
-function timeToMinutes(timeString) {
-  if (!timeString || typeof timeString !== "string") return null;
-
-  const cleanTime = timeString.slice(0, 5);
-  const [hours, minutes] = cleanTime.split(":").map(Number);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-
-  return hours * 60 + minutes;
-}
-
-function isExceptionalOpeningBlock(block) {
-  return String(block.reason || "").startsWith(OPENING_REASON_PREFIX);
-}
-
-function getCleanAvailabilityReason(block) {
-  const reason = String(block.reason || "");
-
-  if (reason.startsWith(OPENING_REASON_PREFIX)) {
-    return reason.replace(OPENING_REASON_PREFIX, "").trim();
-  }
-
-  return reason;
-}
-
-function getExceptionalOpeningsForDate(dateString, availabilityBlocks) {
-  if (!dateString) return [];
-
-  return availabilityBlocks.filter((block) => {
-    if (!block.active) return false;
-    if (!isExceptionalOpeningBlock(block)) return false;
-
-    return !block.recurring && block.block_date === dateString;
-  });
-}
-
-function isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks) {
-  const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length === 0) return false;
-
-  return exceptionalOpenings.some((block) => {
-    const startMinutes = timeToMinutes(block.start_time);
-    const endMinutes = timeToMinutes(block.end_time);
-
-    if (startMinutes === null || endMinutes === null || slotMinutes === null) {
-      return false;
-    }
-
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  });
-}
-
-function hasExceptionalOpeningForDate(dateString, availabilityBlocks) {
-  return getExceptionalOpeningsForDate(dateString, availabilityBlocks).length > 0;
-}
-
-function isSlotBlockedByAvailability(slot, dateString, availabilityBlocks) {
-  if (!dateString) return false;
-
-  const selectedWeekday = getWeekdayFromDate(dateString);
-  const slotMinutes = timeToMinutes(slot);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return !isSlotInsideExceptionalOpening(slot, dateString, availabilityBlocks);
-  }
-
-  return availabilityBlocks.some((block) => {
-    if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
-
-    const appliesToDate =
-      (!block.recurring && block.block_date === dateString) ||
-      (block.recurring && Number(block.weekday) === selectedWeekday);
-
-    if (!appliesToDate) return false;
-
-    if (block.full_day) return true;
-
-    const startMinutes = timeToMinutes(block.start_time);
-    const endMinutes = timeToMinutes(block.end_time);
-
-    if (startMinutes === null || endMinutes === null || slotMinutes === null) {
-      return false;
-    }
-
-    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-  });
-}
-
-function isOperatorBookedAtSlot(bookings, dateString, slot, operatorId) {
-  if (!dateString || !slot || !operatorId) return false;
-
-  return bookings.some((booking) => {
-    if (booking.date !== dateString || booking.time !== slot) return false;
-
-    if (!booking.operator_id) return true;
-
-    return booking.operator_id === operatorId;
-  });
-}
-
-function hasAtLeastOneOperatorAvailableAtSlot(bookings, dateString, slot, activeOperators) {
-  if (!dateString || !slot) return false;
-  if (activeOperators.length === 0) return false;
-
-  return activeOperators.some((operator) => {
-    return !isOperatorBookedAtSlot(bookings, dateString, slot, operator.id);
-  });
-}
-
-function formatAvailabilityBlockTitle(block) {
-  if (isExceptionalOpeningBlock(block)) {
-    return formatLongDate(block.block_date);
-  }
-
-  if (block.recurring) {
-    return `Ogni ${getWeekdayLabel(block.weekday)}`;
-  }
-
-  return formatLongDate(block.block_date);
-}
-
-function formatAvailabilityBlockTime(block) {
-  if (block.full_day) return "Giornata intera";
-
-  return `${String(block.start_time || "").slice(0, 5)} → ${String(block.end_time || "").slice(0, 5)}`;
-}
-
-function getBookingAvailabilityNotice(dateString, availabilityBlocks, availableSlots, allSlots) {
-  if (!dateString) return null;
-
-  const selectedWeekday = getWeekdayFromDate(dateString);
-  const exceptionalOpenings = getExceptionalOpeningsForDate(dateString, availabilityBlocks);
-
-  if (exceptionalOpenings.length > 0) {
-    return {
-      type: "limited",
-      title: "Apertura eccezionale attiva per questa data.",
-      text: "Il salone normalmente potrebbe risultare chiuso, ma per questo giorno sono disponibili solo gli orari aperti manualmente dal barbiere.",
-    };
-  }
-
-  const matchingBlocks = availabilityBlocks.filter((block) => {
-    if (!block.active) return false;
-    if (isExceptionalOpeningBlock(block)) return false;
-
-    return (
-      (!block.recurring && block.block_date === dateString) ||
-      (block.recurring && Number(block.weekday) === selectedWeekday)
-    );
-  });
-
-  const recurringFullDay = matchingBlocks.find(
-    (block) => block.recurring && block.full_day
-  );
-
-  if (recurringFullDay) {
-    return {
-      type: "closed",
-      title: `Il salone è chiuso tutti i ${getWeekdayLabel(selectedWeekday).toLowerCase()}.`,
-      text: "Scegli un altro giorno disponibile per completare la prenotazione.",
-    };
-  }
-
-  const dateFullDay = matchingBlocks.find(
-    (block) => !block.recurring && block.full_day
-  );
-
-  if (dateFullDay) {
-    return {
-      type: "closed",
-      title: "Il salone è chiuso per tutta la giornata selezionata.",
-      text: "Scegli un’altra data per vedere gli orari disponibili.",
-    };
-  }
-
-  const hasRangeBlocks = matchingBlocks.some((block) => !block.full_day);
-
-  if (hasRangeBlocks) {
-    return {
-      type: "limited",
-      title: "In questo giorno alcune fasce orarie non sono disponibili.",
-      text: "Gli orari mostrati sotto sono già filtrati in base alle disponibilità del salone.",
-    };
-  }
-
-  if (availableSlots.length === 0) {
-    const slotsAfterAvailability = (allSlots || []).filter(
-      (slot) => !isSlotBlockedByAvailability(slot, dateString, availabilityBlocks)
-    );
-
-    if (slotsAfterAvailability.length > 0) {
-      return {
-        type: "closed",
-        title: "Tutti gli orari di questa giornata sono già prenotati.",
-        text: "Prova a scegliere un altro giorno o un altro operatore.",
-      };
-    }
-
-    return {
-      type: "closed",
-      title: "Non ci sono orari disponibili per questa data.",
-      text: "Prova a selezionare un altro giorno.",
-    };
-  }
-
-  return null;
-}
 
 const defaultShopSettings = {
   logo_letter: "B",
@@ -487,49 +154,8 @@ function App() {
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [confirmState, setConfirmState] = useState({ open: false, message: "", resolve: null, danger: false });
-  const [toastState, setToastState] = useState({ open: false, message: "", type: "info" });
-
-  function showToast(message, type) {
-    if (!type) {
-      const lower = String(message).toLowerCase();
-      // Rosso: errori tecnici + eliminazioni/cancellazioni
-      if (
-        lower.includes("non è stato possibile") || lower.includes("errore nel") ||
-        lower.startsWith("errore") || lower.includes("impossibile") ||
-        lower.includes("non riuscit") || lower.includes("accesso non riuscito") ||
-        lower.includes("eliminat") || lower.includes("rimoss") || lower.includes("cancellat")
-      ) {
-        type = "error";
-      // Verde: aggiunte, salvataggi, conferme
-      } else if (
-        lower.includes("aggiunto") || lower.includes("creato") || lower.includes("aggiornato") ||
-        lower.includes("aggiornata") || lower.includes("aggiornati") || lower.includes("confermata") ||
-        lower.includes("salvata") || lower.includes("caricata") || lower.includes("completat") ||
-        lower.includes("inviato") || lower.includes("collegato") || lower.includes("correttamente") ||
-        lower.includes("operatore aggiunto") || lower.includes("foto") || lower.includes("prenotazione confermata")
-      ) {
-        type = "success";
-      // Giallo: validazioni e info neutre
-      } else {
-        type = "info";
-      }
-    }
-    setToastState({ open: true, message, type });
-  }
-
-  function showConfirm(message, danger = false) {
-    return new Promise((resolve) => {
-      setConfirmState({ open: true, message, resolve, danger });
-    });
-  }
-
-  function handleConfirmChoice(result) {
-    setConfirmState((prev) => {
-      if (prev.resolve) prev.resolve(result);
-      return { open: false, message: "", resolve: null, danger: false };
-    });
-  }
+  const { toastState, showToast, closeToast } = useToast();
+  const { confirmState, showConfirm, handleConfirmChoice } = useConfirm();
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -728,6 +354,16 @@ function App() {
 
     return session.user.email?.charAt(0)?.toUpperCase() || "U";
   }, [session, userProfile]);
+
+  useEffect(() => {
+    // Legge ?shop=slug dal redirect dell'app registration
+    const urlParams = new URLSearchParams(window.location.search);
+    const shopSlugFromUrl = urlParams.get("shop");
+    if (shopSlugFromUrl) {
+      sessionStorage.setItem("barberbooking_pending_slug", shopSlugFromUrl);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
    useEffect(() => {
   supabase.auth.getSession().then(({ data }) => {
@@ -1130,9 +766,28 @@ if (validShops.length === 1) {
   return validShops;
 }
 
-const currentStillValid = validShops.some((shop) => shop.id === currentShopId);
+// Auto-seleziona il salone se arrivato dal redirect della registrazione
+const pendingSlug = sessionStorage.getItem("barberbooking_pending_slug");
+if (pendingSlug) {
+  const matchedShop = validShops.find((s) => s.slug === pendingSlug);
+  if (matchedShop) {
+    sessionStorage.removeItem("barberbooking_pending_slug");
+    localStorage.setItem("barberbooking_current_shop_id", matchedShop.id);
+    setCurrentShopId(matchedShop.id);
+    setShopChoiceCompleted(true);
+    setShopGateReady(true);
+    return validShops;
+  }
+}
 
-if (!shopChoiceCompleted || !currentStillValid) {
+const savedShopId = localStorage.getItem("barberbooking_current_shop_id");
+const savedStillValid = validShops.some((shop) => shop.id === savedShopId);
+
+if (savedStillValid) {
+  setCurrentShopId(savedShopId);
+  setShopChoiceCompleted(true);
+} else {
+  localStorage.removeItem("barberbooking_current_shop_id");
   setCurrentShopId("");
   setShopChoiceCompleted(false);
 }
@@ -2185,7 +1840,7 @@ return validShops;
     showToast(isOpening ? "Apertura eccezionale rimossa." : "Chiusura rimossa.");
   }
 
-  async function loadBookings() {
+  async function loadBookings(attempt = 1) {
     const { data, error } = await supabase
       .from("bookings")
       .select("date,time,operator_id")
@@ -2195,6 +1850,10 @@ return validShops;
       .order("time", { ascending: true });
 
     if (error) {
+      if (attempt < 3) {
+        await new Promise((res) => setTimeout(res, 2000));
+        return loadBookings(attempt + 1);
+      }
       showToast("Errore nel caricamento degli orari");
       console.error(error);
       return;
@@ -2887,6 +2546,7 @@ await loadLinkedShops(data.user.id);
   setOperators([]);
   setAvailabilityBlocks([]);
 
+  localStorage.setItem("barberbooking_current_shop_id", shopId);
   setCurrentShopId(shopId);
   setShopChoiceCompleted(true);
 }
@@ -3249,7 +2909,7 @@ await loadLinkedShops(data.user.id);
         open={toastState.open}
         message={toastState.message}
         type={toastState.type}
-        onClose={() => setToastState((s) => ({ ...s, open: false }))}
+        onClose={closeToast}
       />
 
       {showCredentialsModal && (
